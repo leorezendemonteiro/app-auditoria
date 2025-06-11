@@ -1,7 +1,8 @@
-"name": "App de Auditoria GES",
+{
+    "name": "App de Auditoria GES",
     "short_name": "Auditoria",
     "description": "Aplicativo para realização de auditorias sanitárias.",
-    "start_url": ".",
+    "start_url": "./index.html",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#3b82f6",
