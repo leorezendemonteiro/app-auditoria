@@ -452,35 +452,3 @@
 </body>
 </html>
 ```
-
----
-
-### Passo 2: Crie/Atualize o arquivo `manifest.webmanifest`
-
-Se você já criou o arquivo no GitHub, **substitua o conteúdo dele** por este abaixo. Se não criou, crie um novo arquivo com o nome `manifest.webmanifest` e cole este código.
-
-
-```json
-{
-    "name": "App de Auditoria GES",
-    "short_name": "Auditoria",
-    "description": "Aplicativo para realização de auditorias sanitárias.",
-    "start_url": "./index.html",
-    "display": "standalone",
-    "background_color": "#ffffff",
-    "theme_color": "#3b82f6",
-    "icons": [
-        {
-            "src": "https://i.postimg.cc/vBvK9KGz/ges.jpg",
-            "sizes": "192x192",
-            "type": "image/jpeg",
-            "purpose": "any maskable"
-        },
-        {
-            "src": "https://i.postimg.cc/vBvK9KGz/ges.jpg",
-            "sizes": "512x512",
-            "type": "image/jpeg",
-            "purpose": "any maskable"
-        }
-    ]
-}
