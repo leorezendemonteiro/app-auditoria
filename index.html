@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App de Auditoria Sanitária</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
+    <!-- Bibliotecas para gerar PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .step, .category-content, .non-conformity-section, .photo-preview, #main-header { display: none; }
+        .step.active, .category-content.active, .non-conformity-section.visible, .photo-preview.visible, #main-header.active { display: flex; }
+        /* Ajuste para o .category-content, que deve ser block */
+        .category-content.active { display: block; }
+
+        .signature-pad { border: 2px dashed #d1d5db; border-radius: 0.5rem; cursor: crosshair; }
+        .photo-preview { max-width: 150px; max-height: 150px; border-radius: 0.5rem; margin-top: 0.5rem; }
+        #loader { border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        #splash-screen {
+            background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('https://images.pexels.com/photos/326279/pexels-photo-326279.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1');
+            background-size: cover;
+            background-position: center;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto max-w-4xl p-4 sm:p-6 md:p-8">
+        
+        <header id="main-header" class="bg-white p-4 sm:p-6 rounded-xl shadow-md mb-8 flex-col sm:flex-row justify-between items-center">
+            <div>
+                <h1 class="text-xl sm:text-2xl font-bold text-gray-900">Auditoria Sanitária</h1>
+                <p id="header-subtitle" class="text-gray-600"></p>
+            </div>
+            <div class="mt-4 sm:mt-0">
+                <img id="company-logo-header" src="https://i.postimg.cc/vBvK9KGz/ges.jpg" alt="Logo da Empresa" class="h-12 sm:h-14 object-contain" crossorigin="anonymous">
+            </div>
+        </header>
+
+        <main>
+            <!-- Etapa 0: Página de Abertura -->
+            <div id="step-0" class="step active">
+                <div id="splash-screen" class="h-[80vh] bg-white rounded-xl shadow-md flex flex-col justify-center items-center text-center p-6">
+                    <img id="company-logo-splash" src="https://i.postimg.cc/vBvK9KGz/ges.jpg" alt="Logo da Empresa" class="h-20 sm:h-24 object-contain mb-8" crossorigin="anonymous">
+                    <h1 class="text-3xl sm:text-4xl font-bold text-white tracking-tight">Ferramenta de Auditoria</h1>
+                    <p class="text-lg text-gray-200 mt-2 mb-10">Pronto para iniciar uma nova inspeção?</p>
+                    <button data-next-step="1" class="bg-blue-600 text-white font-bold py-3 px-10 rounded-lg hover:bg-blue-700 transition-transform hover:scale-105 shadow-xl text-lg">
+                        Iniciar Auditoria
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Etapa 1: Identificação -->
+            <div id="step-1" class="step">
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Dados do Estabelecimento</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="establishment_name" class="block text-sm font-medium text-gray-700 mb-1">Nome do Estabelecimento</label>
+                            <input type="text" id="establishment_name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label for="establishment_address" class="block text-sm font-medium text-gray-700 mb-1">Endereço Completo</label>
+                            <input type="text" id="establishment_address" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label for="inspection_date" class="block text-sm font-medium text-gray-700 mb-1">Data da Inspeção</label>
+                            <input type="date" id="inspection_date" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-8 text-right">
+                    <button data-next-step="2" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors shadow-lg">Próximo</button>
+                </div>
+            </div>
+
+            <!-- Etapa 2: Checklist -->
+            <div id="step-2" class="step">
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <div class="mb-6">
+                        <label for="category-select" class="block text-sm font-bold text-gray-700 mb-2">SELECIONE A CATEGORIA</label>
+                        <select id="category-select" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50 text-base">
+                            <!-- Opções geradas pelo JS -->
+                        </select>
+                    </div>
+                    <div id="checklist-content-container">
+                        <!-- Perguntas geradas pelo JS -->
+                    </div>
+                </div>
+                 <div class="mt-8 flex justify-between">
+                    <button data-prev-step="1" class="bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-lg hover:bg-gray-400">Anterior</button>
+                    <button data-next-step="3" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 shadow-lg">Finalizar e Ver Resultado</button>
+                </div>
+            </div>
+
+            <!-- Etapa 3: Resultado -->
+            <div id="step-3" class="step">
+                 <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Resultado da Auditoria</h2>
+                    <div id="score-display" class="text-center p-8 rounded-lg">
+                        <p class="text-lg font-medium text-gray-600">Pontuação Final</p>
+                        <p id="final-score" class="text-6xl font-bold my-2">0.0</p>
+                        <p id="score-alert" class="text-xl font-semibold"></p>
+                    </div>
+                </div>
+                 <div class="mt-8 flex justify-between">
+                    <button data-prev-step="2" class="bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-lg hover:bg-gray-400">Anterior</button>
+                    <button data-next-step="4" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 shadow-lg">Ir para Assinaturas</button>
+                </div>
+            </div>
+
+            <!-- Etapa 4: Assinaturas -->
+            <div id="step-4" class="step">
+                 <div class="bg-white p-6 rounded-xl shadow-md">
+                     <h2 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Assinaturas</h2>
+                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Assinatura do Responsável</label>
+                            <canvas id="signature-pad-responsible" class="signature-pad w-full h-40 bg-gray-50"></canvas>
+                            <div class="text-right mt-2"><button data-clear-for="signature-pad-responsible" class="text-sm text-gray-600 hover:text-red-600">Limpar</button></div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Assinatura do Auditor</label>
+                            <canvas id="signature-pad-auditor" class="signature-pad w-full h-40 bg-gray-50"></canvas>
+                             <div class="text-right mt-2"><button data-clear-for="signature-pad-auditor" class="text-sm text-gray-600 hover:text-red-600">Limpar</button></div>
+                        </div>
+                     </div>
+                </div>
+                 <div class="mt-8 flex justify-between items-center">
+                    <button data-prev-step="3" class="bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-lg hover:bg-gray-400">Anterior</button>
+                    <button id="generate-pdf-btn" class="bg-green-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-green-700 shadow-lg">Gerar Relatório PDF</button>
+                </div>
+            </div>
+            
+            <!-- Etapa 5: Loader -->
+            <div id="step-5" class="step justify-center items-center flex-col text-center py-10">
+                 <div id="loader" class="mx-auto"></div>
+                 <p class="mt-4 text-lg font-semibold text-gray-700">Gerando seu relatório...</p>
+                 <p class="text-gray-500">Isso pode levar alguns segundos.</p>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const { jsPDF } = window.jspdf;
+        const checklistData = [{"category":"EDIFICAÇÃO, INSTALAÇÕES, EQUIPAMENTOS, MÓVEIS E UTENSÍLIOS","questions":[{"id":"q1","text":"A área externa é pavimentada? Não possui focos de insalubridade, esgotos, ou que oferece condições de proliferação de insetos ou roedores; ou seja uma fonte de contaminação física (como, por exemplo árvores)?"},{"id":"q2","text":"O acesso á empresa é independente e direto, não comum a outros usos?"},{"id":"q3","text":"As áreas internas e externas do estabelecimento estão livres de objetos em desuso ou estranhos ao ambiente, não sendo permitida a presença de animais?"},{"id":"q4","text":"As edificações e instalações são projetadas de forma a possibilitar um fluxo ordenado e sem cruzamentos em todas as etapas da preparação de alimentos e a facilitar as operações de manutenção, limpeza e, quando for o caso, desinfecção?"},{"id":"q5","text":"O dimensionamento da edificação e das instalações é compatível com todas as operações? Existe separação entre as diferentes atividades por meios físicos ou por meios eficazes de forma a evitar a contaminação cruzada?"},{"id":"q6","text":"As instalações físicas como piso, parede e teto possuem revestimento liso, impermeável e lavável? As mesmas são mantidos íntegros, conservados, livres de rachaduras, trincas, goteiras, vazamentos, infiltrações, bolores, descascamentos, dentro outros; e não transmite contaminantes aos alimentos?"},{"id":"q7","text":"As portas e janelas são mantidas ajustadas aos batentes? As portas da área de preparação e armazenamento de alimentos são dotadas de fechamento automático? As aberturas externas das áreas de armazenamento e preparação de alimentos inclusive o sistema de exaustão, são providas de telas milimetradas para impedir o acesso de vetores e pragas urbanas? As mesmas são removíveis e estão rente ao batente?"},{"id":"q8","text":"As instalações são abastecidas de água corrente e dispõe de conexões com rede de esgoto ou fossa séptica? Os ralos estão localizados estratégicos à facilitar a hig. do piso e são sifonados e as grelhas possuem dispositivo que permitem seu fechamento?"},{"id":"q9","text":"As caixas de gordura e de esgoto possuem dimensão compatível ao volume de resíduos, sendo localizados fora da área de preparação e armazenamento de alimentos? A mesma apresenta adequado estado de conservação e funcionamento?"},{"id":"q10","text":"A iluminação da área de preparação proporciona a visualização de forma que as atividades sejam realizadas sem comprometer a higiene e as características sensorias dos alimentos? As luminárias localizadas sobre a área de preparação dos alimentos são apropriadas e protegidas contra explosão e quedas acidentais?"},{"id":"q11","text":"As instalações elétricas são embutidas ou protegidas em tubulações externas e íntegras de forma a permitir a higienização dos ambientes?"},{"id":"q12","text":"A ventilação garante a renovação do ar e a manutenção do ambiente livre de fungos, gases, fumaça, pós, partículas em suspensão, condensação de vapores dentre outros, que possam comprometer a qualidade higiênco-sanitária do alimento? O fluxo de ar não incide diretamente sobre os alimentos? Os equipamentos e os filtros para climatização estão conservados? A limpeza dos componentes do sistema de climatização, a troca de filtros e a manutenção são programadas e periódicas e registradas e realizadas conforme legislação específica?"},{"id":"q13","text":"As instalações sanitárias e os vestiários não se comunicam diretamente com a área de produção, armazenamento de alimentos ou refeitórios? As portas são dotadas de fechamento automático? São mantidos organizados e em adequado estado de conservação?"},{"id":"q14","text":"As instalações sanitárias e os vestiários são bem iluminados, com paredes e pisos de cor clara, de material liso, impermeável, portas com mola hidráulica, ventilação suficiente com janelas?"},{"id":"q15","text":"As instalações sanitárias possuem lavatórios e estão supridos de produtos destinados à higiene pessoal, tais como papel higiênico, sabonete líquido inodoro e produto anti-séptico e toalhas de papel não reciclado ou outro sistema higiênico e seguro para secagem das mãos? Os coletores dos resíduos são dotados de tampa e acionados sem contato manual?"},{"id":"q16","text":"Existem lavatórios exclusivos para a higiene das mãos na área de manipulação, em posições estratégicas em relação ao fluxo de preparo dos alimentos e em número suficiente de modo a atender toda a área de preparação? Os lavatórios possuem sabonete líquido inodoro anti-séptico ou sabonete líquido inodoro e produto anti-séptico, toalhas de papel não reciclado ou outro sistema higiênico e seguro de secagem das mãos e coletor de papel, acionado sem contato manual?"},{"id":"q17","text":"Os equipamentos, móveis e utensílios que entram em contato com alimentos são de materiais que não transmitem substâncias tóxicas, odores, nem sabores aos mesmos, conforme estabelecido em legislação específica? Os mesmos são mantidos em adequado estado de conservação e são resistentes à corrosão e a repetidas operações de limpeza e desinfecção? São realizadas manutenções e calibrações programadas e periódicas de equipamentos, mantendo registro da realização dessas operações?"},{"id":"q18","text":"Existem pias separadas, no mínimo uma para manipulação de alimentos, outra para higienização de utensílios e outro tanque para limpeza de panos e outros similares?"},{"id":"q19","text":"As superfícies dos equipamentos, móveis e utensílios utilizados na preparação, embalagem, armazenamento, transporte, distribuição e exposição dos alimentos devem ser lisas, impermeáveis, laváveis e estão isentas de rugosidades, frestas e outras imperfeições que possam comprometer a higienização dos mesmos e serem fonte de contaminação dos alimentos?"},{"id":"q20","text":"A área da casa do gás e os botijões intalados condizem com o rítmo de produção da unidade? As intalações de gás estão em local exclusivo, isolado, com tela, grades vazadas, ou outra estrutyra construída que evite a passagem de pessoas estranhas às instalações e permite contante ventilação?"}]},{"category":"HIGIENIZAÇÃO DE INSTALAÇÕES, EQUIPAMENTOS, MÓVEIS E UTENSÍLIOS","questions":[{"id":"q21","text":"As instalações, os equipamentos, os móveis e os utensílios são mantidos em condições higiênico-sanitárias apropriadas? As operações de higienização são realizadas por funcionários comprovadamente capacitados e com freqüência que garanta a manutenção dessas condições e minimize o risco de contaminação do alimento?"},{"id":"q22","text":"As caixas de gordura são periodicamente limpas? O descarte dos resíduos atende ao disposto em legislação específica?"},{"id":"q23","text":"As operações de limpeza e, se for o caso, de desinfecção das instalações e equipamentos, quando não são realizadas rotineiramente, são registradas?"},{"id":"q24","text":"A área de preparação do alimento são higienizada quantas vezes necessárias e imediatamente após o término do trabalho? São tomadas precauções para impedir a contaminação dos alimentos causada por produtos saneantes, pela suspensão de partículas e pela formação de aerossóis? Substâncias odorizantes e ou desodorantes em quaisquer das suas formas não são utilizadas nas áreas de preparação e armazenamento dos alimentos?"},{"id":"q25","text":"Os produtos saneantes utilizados são regularizados pelo Ministério da Saúde? A diluição, o tempo de contato e modo de uso/aplicação dos produtos saneantes obedecerm às instruções recomendadas pelo fabricante? Os produtos saneantes são identificados e guardados em local reservado para essa finalidade?"},{"id":"q26","text":"Os utensílios e equipamentos utilizados na higienização são próprios para a atividade e estão conservados, limpos e disponíveis em número suficiente e guardados em local reservado para essa finalidade? Os utensílios utilizados na higienização de instalações estão distintos daqueles usados para higienização das partes dos equipamentos e utensílios que entrem em contato com o alimento?"},{"id":"q27","text":"Os funcionários responsáveis pela atividade de higienização das instalações sanitárias utilizam uniformes apropriados e diferenciados daqueles utilizados na manipulação de alimentos?"}]},{"category":"CONTROLE INTEGRADO DE PRAGAS URBANAS","questions":[{"id":"q28","text":"A edificação, as instalações, os equipamentos, os móveis e os utensílios estão livres de vetores e pragas urbanas? Existe um conjunto de ações eficazes e contínuas de controle de vetores e pragas urbanas, com o objetivo de impedir a atração, o abrigo, o acesso e ou proliferação dos mesmos?"},{"id":"q29","text":"Quando as medidas de prevenção adotadas não forem eficazes, o controle químico é empregado e executado por empresa especializada, conforme legislação específica, com produtos desinfestantes regularizados pelo Ministério da Saúde?"},{"id":"q30","text":"Quando da aplicação do controle químico, a empresa especializada estabelece procedimentos pré e pós tratamento a fim de evitar a contaminação dos alimentos, equipamentos e utensílios? Quando aplicável, os equipamentos e os utensílios, antes de serem reutilizados, devem ser higienizados para a remoção dos resíduos de produtos desinfestantes?"}]},{"category":"ABASTECIMENTO DE ÁGUA","questions":[{"id":"q31","text":"É utilizada somente água potável para manipulação de alimentos? Quando utilizada solução alternativa de abastecimento de água, a potabilidade é atestada semestralmente mediante laudos laboratoriais, sem prejuízo de outras exigências previstas em legislação específica? Há filtros de alta vazão nas torneiras em que a água é utilizada como ingrediente?"},{"id":"q32","text":"O gelo para utilização em alimentos é fabricado a partir de água potável, mantido em condição higiênico-sanitária que evite sua contaminação?"},{"id":"q33","text":"O reservatório de água é edificado e revestido de materiais que não comprometem a qualidade da água, conforme legislação específica? O mesmo está livre de rachaduras, vazamentos, infiltrações, descascamentos dentre outros defeitos e em adequado estado de higiene e conservação e devidamente tampado? O reservatório de água é higienizado, em um intervalo máximo de seis meses, e há registros da operação?"}]},{"category":"MANIPULADORES","questions":[{"id":"q34","text":"O controle da saúde dos manipuladores são registrados e realizados de acordo com a legislação específica?"},{"id":"q35","text":"Os manipuladores que apresentarem lesões e ou sintomas de enfermidades que possam comprometer a qualidade higiênico-sanitária dos alimentos são afastados da atividade de preparação de alimentos enquanto persistirem essas condições de saúde?"},{"id":"q36","text":"Os manipuladores têm asseio pessoal, apresentando-se com uniformes compatíveis à atividade, conservados e limpos. Os uniformes devem ser trocados, no mínimo, diariamente e usados exclusivamente nas dependências internas do estabelecimento? As roupas e os objetos pessoais são guardados em local específico e reservado para esse fim?"},{"id":"q37","text":"Os manipuladores lavam cuidadosamente as mãos ao chegar ao trabalho, antes e após manipular alimentos, após qualquer interrupção do serviço, após tocar materiais contaminados, após usar os sanitários e sempre que se fizer necessário? Estão afixados cartazes de orientação aos manipuladores sobre a correta lavagem e antisepsia das mãos e demais hábitos de higiene, em locais de fácil visualização, inclusive nas instalações sanitárias e lavatórios?"},{"id":"q38","text":"Os manipuladores não fumam, falam desnecessariamente, cantam, assobiam, espirram, cuspem, tossem, comem, manipulam dinheiro ou praticam outros atos que possam contaminar o alimento, durante o desempenho das atividades?"},{"id":"q39","text":"Os manipuladores usam cabelos presos e protegidos por redes, toucas ou outro acessório apropriado para esse fim, não sendo permitido o uso de barba? As unhas estão curtas e sem esmalte ou base? Durante a manipulação, são retirados todos os objetos de adorno pessoal e a maquiagem?"},{"id":"q40","text":"Os manipuladores de alimentos são supervisionados e capacitados periodicamente em higiene pessoal, em manipulação higiênica dos alimentos e em doenças transmitidas por alimentos? A capacitação é comprovada mediante documentação?"},{"id":"q41","text":"Os visitantes cumprem os requisitos de higiene e de saúde estabelecidos para os manipuladores?"}]},{"category":"MANEJO DOS RESÍDUOS","questions":[{"id":"q42","text":"Todos os recipientes identificados e íntegros, de fácil higienização e transporte, em número e capacidade suficientes para conter os resíduos?"},{"id":"q43","text":"Os coletores utilizados para deposição dos resíduos das áreas de preparação e armazenamento de alimentos são dotados de tampas acionadas sem contato manual?"},{"id":"q44","text":"Os resíduos são frequentemente coletados e estocados em local fechado e isolado da área de preparação e armazenamento dos alimentos, de forma a evitar focos de contaminação e atração de vetores e pragas urbanas?"}]},{"category":"MATÉRIAS-PRIMAS, INGREDIENTES E EMBALAGENS","questions":[{"id":"q45","text":"Há especificação dos critérios para avaliação e seleção dos fornecedores de matérias-primas, ingredientes e embalagens? O transporte desses insumos são realizados em condições adequadas de higiene e conservação?"},{"id":"q46","text":"A recepção das matérias-primas, dos ingredientes e das embalagens é realizada em área protegida e limpa? São adotadas medidas para evitar que esses insumos contaminem o alimento preparado?"},{"id":"q47","text":"As matérias-primas, os ingredientes e as embalagens são submetidos à inspeção e aprovados na recepção? As embalagens primárias das matérias-primas e dos ingredientes estão íntegras? A temperatura das matérias-primas e ingredientes que necessitem de condições especiais de conservação é verificada nas etapas de recepção e de armazenamento?"},{"id":"q48","text":"Os lotes das matérias-primas, dos ingredientes ou das embalagens reprovados ou com prazos de validade vencidos são imediatamente devolvidos ao fornecedor e, na impossibilidade, são devidamente identificados e armazenados separadamente? è determinada a destinação final dos mesmos?"},{"id":"q49","text":"As matérias-primas, os ingredientes e as embalagens são armazenados em local limpo e organizado, de forma a garantir proteção contra contaminantes? São adequadamente acondicionados e identificados, e sua utilização respeita o prazo de validade? Para os alimentos dispensados da obrigatoriedade da indicação do prazo de validade, é observada a ordem de entrada dos mesmos?"},{"id":"q50","text":"As matérias-primas, os ingredientes e as embalagens são armazenados sobre paletes, estrados e ou prateleiras, respeitando-se o espaçamento mínimo necessário para garantir adequada ventilação, limpeza e, quando for o caso, desinfecção do local? Os paletes, estrados e ou prateleiras são de material liso, resistente, impermeável e lavável?"}]},{"category":"PREPARAÇÃO DO ALIMENTO","questions":[{"id":"q51","text":"As matérias-primas, os ingredientes e as embalagens utilizados para preparação do alimento estão em condições higiênico-sanitárias adequadas e em conformidade com a legislação específica?"},{"id":"q52","text":"O quantitativo de funcionários, equipamentos, móveis e ou utensílios disponíveis são compatíveis com volume, diversidade e complexidade das preparações alimentícias?"},{"id":"q53","text":"Durante a preparação dos alimentos, são adotadas medidas a fim de minimizar o risco de contaminação cruzada? Evita-se o contato direto ou indireto entre alimentos crus, semi-preparados e prontos para o consumo?"},{"id":"q54","text":"Os funcionários que manipulam alimentos crus realizam a lavagem e a anti-sepsia das mãos antes de manusear alimentos preparados?"},{"id":"q55","text":"As matérias-primas e os ingredientes caracterizados como produtos perecíveis são expostos à temperatura ambiente somente pelo tempo mínimo necessário para a preparação do alimento, a fim de não comprometer a qualidade higiênico-sanitária do alimento preparado?"},{"id":"q56","text":"Quando as matérias-primas e os ingredientes não forem utilizados em sua totalidade, são adequadamente acondicionados e identificados com, no mínimo, as seguintes informações: designação do produto, data de fracionamento e prazo de validade após a abertura ou retirada da embalagem original?"},{"id":"q57","text":"Quando aplicável, antes de iniciar a preparação dos alimentos, procede-se à adequada limpeza das embalagens primárias das matérias-primas e dos ingredientes, minimizando o risco de contaminação?"},{"id":"q58","text":"O tratamento térmico garante que todas as partes do alimento atinjam a temperatura de, no mínimo, 70ºC (setenta graus Celsius). Temperaturas inferiores podem ser utilizadas no tratamento térmico desde que as combinações de tempo e temperatura sejam suficientes para assegurar a qualidade higiênico-sanitária dos alimentos."},{"id":"q59","text":"A eficácia do tratamento térmico é avaliada pela verificação da temperatura e do tempo utilizados e, quando aplicável, pelas mudanças na textura e cor na parte central do alimento."},{"id":"q60","text":"Para os alimentos que forem submetidos à fritura, além dos controles estabelecidos para um tratamento térmico, institui-se medidas que garantam que o óleo e a gordura utilizados não constituam uma fonte de contaminação química do alimento preparado?"},{"id":"q61","text":"Os óleos e gorduras utilizados são aquecidos a temperaturas não superiores a 180ºC (cento e oitenta graus Celsius), sendo substituídos imediatamente sempre que houver alteração evidente das características físicoquímicas ou sensoriais, tais como aroma e sabor, e formação intensa de espuma e fumaça?"},{"id":"q62","text":"Para os alimentos congelados, antes do tratamento térmico, procede-se ao descongelamento, a fim de garantir adequada penetração do calor? Excetuam-se os casos em que o fabricante do alimento recomenda que o mesmo seja submetido ao tratamento térmico ainda congelado, devendo ser seguidas as orientações constantes da rotulagem."},{"id":"q63","text":"O descongelamento é conduzido de forma a evitar que as áreas superficiais dos alimentos se mantenham em condições favoráveis à multiplicação microbiana? O descongelamento é efetuado em condições de refrigeração à temperatura inferior a 5ºC (cinco graus Celsius) ou em forno de microondas quando o alimento for submetido imediatamente à cocção?"},{"id":"q64","text":"Os alimentos submetidos ao descongelamento são mantidos sob refrigeração se não forem imediatamente utilizados, não sendo recongelados?"},{"id":"q65","text":"Após serem submetidos à cocção, os alimentos preparados são mantidos em condições de tempo e de temperatura que não favoreçam a multiplicação microbiana? Para conservação a quente, os alimentos são submetidos à temperatura superior a 60ºC (sessenta graus Celsius) por, no máximo, 6 (seis) horas? Para conservação sob refrigeração ou congelamento, os alimentos são previamente submetidos ao processo de resfriamento?"},{"id":"q66","text":"O processo de resfriamento de um alimento preparado é realizado de forma a minimizar o risco de contaminação cruzada e a permanência do mesmo em temperaturas que favoreçam a multiplicação microbiana? A temperatura do alimento preparado é reduzida de 60ºC (sessenta graus Celsius) a 10ºC (dez graus Celsius) em até duas horas? Em seguida, o mesmo é conservado sob refrigeração a temperaturas inferiores a 5ºC (cinco graus Celsius), ou congelado à temperatura igual ou inferior a -18ºC (dezoito graus Celsius negativos)?"},{"id":"q67","text":"O prazo máximo de consumo do alimento preparado e conservado sob refrigeração a temperatura de 4ºC (quatro graus Celsius), ou inferior, é de 5 (cinco) dias? Quando forem utilizadas temperaturas superiores a 4ºC (quatro graus Celsius) e inferiores a 5ºC (cinco graus Celsius), o prazo máximo de consumo é reduzido,de forma a garantir as condições higiênico-sanitárias do alimento preparado?"},{"id":"q68","text":"Caso o alimento preparado seja armazenado sob refrigeração ou congelamento é idendificado no mínimo com as seguintes informações: designação, data de preparo e prazo de validade? A temperatura de armazenamento é regularmente monitorada e registrada?"},{"id":"q69","text":"Quando aplicável, os alimentos a serem consumidos crus são submetidos a processo de higienização a fim de reduzir a contaminação superficial? Os produtos utilizados na higienização dos alimentos são regularizados no órgão competente do Ministério da Saúde e serem aplicados de forma a evitar a presença de resíduos no alimento preparado?"},{"id":"q70","text":"O estabelecimento tem implementado e mantem documentado o controle e garantia da qualidade dos alimentos preparados?"}]},{"category":"ARMAZENAMENTO E TRANSPORTE DO PRODUTO PREPARADO","questions":[{"id":"q71","text":"Os alimentos preparados mantidos na área de armazenamento ou aguardando o transporte estão identificados e protegidos contra contaminantes? Na identificação deve constar, no mínimo, a designação do produto, a data de preparo e o prazo de validade?"},{"id":"q72","text":"O armazenamento e o transporte do alimento preparado, da distribuição até a entrega ao consumo, ocorre em condições de tempo e temperatura que não comprometam sua qualidade higiênico-sanitária? A temperatura do alimento preparado é monitorada durante essas etapas?"},{"id":"q73","text":"Os meios de transporte do alimento preparado são higienizados, sendo adotadas medidas a fim de garantir a ausência de vetores e pragas urbanas? Os veículos são dotados de cobertura para proteção da carga, não transportando outras cargas que comprometam a qualidade higiênico-sanitária do alimento preparado?"}]},{"category":"EXPOSIÇÃO AO CONSUMO DO ALIMENTO PREPARADO","questions":[{"id":"q74","text":"As áreas de exposição do alimento preparado e de consumação são mantidas organizadas e em adequadas condições higiênico-sanitárias? Os equipamentos, móveis e utensílios disponíveis nessas áreas são compatíveis com as atividades, em número suficiente e em adequado estado de conservação?"},{"id":"q75","text":"Os manipuladores adotam procedimentos que minimizem o risco de contaminação dos alimentos preparados por meio da anti-sepsia das mãos e pelo uso de utensílios ou luvas descartáveis?"},{"id":"q76","text":"Os equipamentos necessários à exposição ou distribuição de alimentos preparados sob temperaturas controladas, são devidamente dimensionados, e estão em adequado estado de higiene, conservação e funcionamento? A temperatura desses equipamentos é regularmente monitorada?"},{"id":"q77","text":"O equipamento de exposição do alimento preparado na área de consumação dispõe de barreiras de proteção que previnam a contaminação do mesmo em decorrência da proximidade ou da ação do consumidor e de outras fontes?"},{"id":"q78","text":"Os utensílios utilizados na consumação do alimento, tais como pratos, copos, talheres, são descartáveis ou, quando feitos de material não-descartável, devidamente higienizados, sendo armazenados em local protegido?"},{"id":"q79","text":"Os ornamentos e plantas localizados na área de consumação ou refeitório não constituem fonte de contaminação para os alimentos preparados?"},{"id":"q80","text":"A área do serviço de alimentação onde se realiza a atividade de recebimento de dinheiro, cartões e outros meios utilizados para o pagamento de despesas, é reservada? Os funcionários responsáveis por essa atividade não manipulam alimentos preparados, embalados ou não?"}]}];
+        
+        let currentStep = 0;
+        let signaturePadResponsible, signaturePadAuditor;
+        const mainHeader = document.getElementById('main-header');
+        const headerSubtitle = document.getElementById('header-subtitle');
+
+        const navigateToStep = (stepNumber) => {
+            document.querySelectorAll('.step').forEach(step => step.classList.remove('active'));
+            const nextStepEl = document.getElementById(`step-${stepNumber}`);
+            if (nextStepEl) {
+                nextStepEl.classList.add('active');
+                if (stepNumber > 0) mainHeader.classList.add('active');
+                else mainHeader.classList.remove('active');
+                
+                if (stepNumber === 5) nextStepEl.style.display = 'flex';
+                currentStep = stepNumber;
+                updateHeaderSubtitle();
+                if (stepNumber === 3) calculateScore();
+                if (stepNumber === 4 && !signaturePadResponsible) initializeSignaturePads();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        };
+        
+        const updateHeaderSubtitle = () => {
+            const subtitles = ["", "Etapa 1: Identificação", "Etapa 2: Checklist", "Etapa 3: Resultado", "Etapa 4: Assinaturas", "Gerando Relatório..."];
+            headerSubtitle.textContent = subtitles[currentStep] || '';
+        };
+
+        const generateChecklistHTML = () => {
+            const categorySelect = document.getElementById('category-select');
+            const checklistContentContainer = document.getElementById('checklist-content-container');
+            
+            checklistData.forEach((category, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = category.category;
+                categorySelect.appendChild(option);
+            });
+
+            const showCategory = (index) => {
+                checklistContentContainer.innerHTML = '';
+                const category = checklistData[index];
+                const categoryContent = document.createElement('div');
+                categoryContent.className = 'category-content active space-y-4';
+                categoryContent.dataset.categoryIndex = index;
+
+                category.questions.forEach(question => {
+                    const questionWrapper = document.createElement('div');
+                    questionWrapper.id = `wrapper-${question.id}`;
+                    questionWrapper.className = 'py-4 border-b last:border-b-0';
+                    questionWrapper.innerHTML = `<p class="font-medium text-gray-700">${question.text}</p><div class="flex flex-wrap gap-4 mt-2">${['Conforme', 'Não Conforme', 'Não se Aplica'].map(opt => `<label class="flex items-center space-x-2 cursor-pointer"><input type="radio" name="${question.id}" value="${opt}" class="form-radio h-5 w-5 text-blue-600" data-question-id="${question.id}"><span>${opt}</span></label>`).join('')}</div><div id="nc-${question.id}" class="non-conformity-section mt-4 p-4 rounded-lg"><label class="block text-sm font-medium text-red-700 mb-1">Descreva a não conformidade:</label><textarea class="w-full px-3 py-2 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500" rows="3"></textarea><label class="mt-2 cursor-pointer inline-block bg-red-500 text-white text-sm font-semibold py-2 px-4 rounded-md hover:bg-red-600">Anexar Foto<input type="file" accept="image/*" class="hidden" data-preview-id="preview-${question.id}"></label><img id="preview-${question.id}" class="photo-preview"/></div>`;
+                    categoryContent.appendChild(questionWrapper);
+                });
+                checklistContentContainer.appendChild(categoryContent);
+            };
+
+            categorySelect.addEventListener('change', (e) => {
+                showCategory(e.target.value);
+            });
+            showCategory(0);
+        };
+        
+        document.addEventListener('click', (e) => {
+            if (e.target.matches('[data-next-step]')) navigateToStep(parseInt(e.target.dataset.nextStep));
+            if (e.target.matches('[data-prev-step]')) navigateToStep(parseInt(e.target.dataset.prevStep));
+            if (e.target.matches('[data-clear-for]')) {
+                const padId = e.target.dataset.clearFor;
+                if(padId === 'signature-pad-responsible' && signaturePadResponsible) signaturePadResponsible.clear();
+                if(padId === 'signature-pad-auditor' && signaturePadAuditor) signaturePadAuditor.clear();
+            }
+        });
+        
+        document.addEventListener('change', function(e) {
+            if (e.target.matches('input[type="radio"]')) {
+                document.getElementById(`nc-${e.target.dataset.questionId}`).classList.toggle('visible', e.target.value === 'Não Conforme');
+            }
+            if (e.target.matches('input[type="file"]')) {
+                const previewImg = document.getElementById(e.target.dataset.previewId);
+                const file = e.target.files[0];
+                if (file && previewImg) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => { previewImg.src = event.target.result; previewImg.classList.add('visible'); };
+                    reader.readAsDataURL(file);
+                }
+            }
+        });
+
+        const calculateScore = () => {
+            let totalQuestions = 0, conformeCount = 0, naCount = 0;
+            checklistData.forEach(cat => cat.questions.forEach(q => {
+                totalQuestions++;
+                const selected = document.querySelector(`input[name="${q.id}"]:checked`);
+                if(selected) {
+                    if (selected.value === 'Conforme') conformeCount++;
+                    if (selected.value === 'Não se Aplica') naCount++;
+                }
+            }));
+            const applicable = totalQuestions - naCount;
+            const score = applicable > 0 ? (conformeCount / applicable) * 10 : 10;
+            
+            const scoreEl = document.getElementById('final-score');
+            const alertEl = document.getElementById('score-alert');
+            const displayEl = document.getElementById('score-display');
+            scoreEl.textContent = score.toFixed(1);
+            displayEl.className = 'text-center p-8 rounded-lg';
+            if (score <= 5.9) { alertEl.textContent = 'ALERTA VERMELHO'; displayEl.classList.add('bg-red-100', 'text-red-800'); }
+            else if (score <= 7.9) { alertEl.textContent = 'ALERTA AMARELO'; displayEl.classList.add('bg-yellow-100', 'text-yellow-800'); }
+            else { alertEl.textContent = 'ALERTA VERDE'; displayEl.classList.add('bg-green-100', 'text-green-800'); }
+        };
+
+        function initializeSignaturePads() {
+            const setupPad = (id) => {
+                const canvas = document.getElementById(id);
+                const ratio = Math.max(window.devicePixelRatio || 1, 1);
+                canvas.width = canvas.offsetWidth * ratio;
+                canvas.height = canvas.offsetHeight * ratio;
+                canvas.getContext("2d").scale(ratio, ratio);
+                const pad = new SignaturePad(canvas, { backgroundColor: 'rgb(249, 250, 251)' });
+                if (canvas.dataset.signature) pad.fromDataURL(canvas.dataset.signature);
+                pad.addEventListener("endStroke", () => { canvas.dataset.signature = pad.toDataURL(); });
+                return pad;
+            };
+            if(!signaturePadResponsible) signaturePadResponsible = setupPad('signature-pad-responsible');
+            if(!signaturePadAuditor) signaturePadAuditor = setupPad('signature-pad-auditor');
+        }
+
+        document.getElementById('generate-pdf-btn').addEventListener('click', async () => {
+            navigateToStep(5);
+            
+            const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+            let y = 15;
+
+            const addText = (text, x, size, style, customY) => {
+                doc.setFontSize(size).setFont('helvetica', style);
+                const splitText = doc.splitTextToSize(text, 180);
+                doc.text(splitText, x, customY || y);
+                if(!customY) y += (splitText.length * (size * 0.35)) + 2;
+            };
+            
+            const logoImg = document.getElementById('company-logo-header');
+            doc.addImage(logoImg, 'JPEG', 15, y, 30, 10);
+            addText('Relatório de Auditoria Sanitária', 105, 18, 'bold', 22);
+            y += 20; doc.setLineWidth(0.5).line(15, y, 195, y); y += 10;
+
+            addText(`Nome: ${document.getElementById('establishment_name').value}`, 15, 11, 'normal');
+            addText(`Endereço: ${document.getElementById('establishment_address').value}`, 15, 11, 'normal');
+            addText(`Data: ${new Date(document.getElementById('inspection_date').value).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}`, 15, 11, 'normal');
+            y += 5;
+
+            for (const category of checklistData) {
+                if (y > 250) { doc.addPage(); y = 15; }
+                addText(category.category, 15, 14, 'bold');
+                
+                for (const question of category.questions) {
+                    if (y > 260) { doc.addPage(); y = 15; }
+                    const answer = document.querySelector(`input[name="${question.id}"]:checked`)?.value || "Não respondido";
+                    
+                    let answerColor = '#000000';
+                    if (answer === 'Conforme') answerColor = '#16a34a';
+                    if (answer === 'Não Conforme') answerColor = '#dc2626';
+                    if (answer === 'Não se Aplica') answerColor = '#6b7280';
+                    
+                    addText(question.text, 15, 11, 'normal'); 
+                    doc.setTextColor(answerColor);
+                    addText(`   Resposta: ${answer}`, 15, 11, 'bold');
+                    doc.setTextColor('#000000');
+                    
+                    if (answer === 'Não Conforme') {
+                        const ncSection = document.getElementById(`nc-${question.id}`);
+                        const ncText = ncSection.querySelector('textarea').value;
+                        const ncPhoto = ncSection.querySelector('img.visible');
+                        
+                        addText(`   Observação: ${ncText || 'Nenhuma.'}`, 15, 10, 'normal');
+
+                        if (ncPhoto && ncPhoto.src && ncPhoto.src.startsWith('data:image')) {
+                            try {
+                                const imgData = ncPhoto.src;
+                                if (y > 220) { doc.addPage(); y = 15; }
+                                doc.addImage(imgData, 'JPEG', 20, y, 45, 40, undefined, 'FAST');
+                                y += 45;
+                            } catch (error) {
+                                console.error("Erro ao adicionar imagem ao PDF:", error);
+                                addText("   Erro ao carregar foto.", 15, 9, 'italic');
+                            }
+                        }
+                    }
+                     y += 2;
+                }
+            }
+            
+            if (y > 200) { doc.addPage(); y = 15; }
+            doc.setLineWidth(0.5).line(15, y, 195, y); y += 10;
+            
+            addText('Resultado Final', 105, 16, 'bold', y + 5);
+            addText(`Pontuação: ${document.getElementById('final-score').textContent}`, 105, 12, 'normal', y + 15);
+            addText(document.getElementById('score-alert').textContent, 105, 12, 'bold', y + 22);
+            
+            y += 40;
+            
+            const addSignature = (canvas, label, x) => {
+                if (!new SignaturePad(canvas).isEmpty()) {
+                    doc.addImage(canvas.toDataURL('image/png'), 'PNG', x, y, 60, 30);
+                }
+                doc.setLineWidth(0.2).line(x, y + 32, x + 60, y + 32);
+                doc.setFontSize(10).text(label, x + 5, y + 37);
+            };
+            
+            addSignature(document.getElementById('signature-pad-responsible'), 'Assinatura do Responsável', 25);
+            addSignature(document.getElementById('signature-pad-auditor'), 'Assinatura do Auditor', 115);
+            
+            const fileName = `Relatorio-${(document.getElementById('establishment_name').value || 'Auditoria').replace(/[^a-z0-9]/gi, '_')}.pdf`;
+            doc.save(fileName);
+            
+            navigateToStep(4);
+        });
+
+        window.onload = () => {
+            document.getElementById('inspection_date').valueAsDate = new Date();
+            generateChecklistHTML();
+        };
+
+    </script>
+</body>
+</html>
