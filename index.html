@@ -199,10 +199,7 @@
             const category = checklistData[currentCategoryIndex];
             const question = category.questions[currentQuestionIndex];
             
-            // Esconde todas as outras perguntas
             document.querySelectorAll('.question-container').forEach(qc => qc.classList.remove('active'));
-            
-            // Mostra a pergunta atual
             const questionWrapper = document.getElementById(`q-container-${question.id}`);
             if (questionWrapper) {
                 questionWrapper.classList.add('active');
@@ -213,10 +210,9 @@
         };
 
         const initChecklist = () => {
-             // Gera todas as perguntas de uma vez, mas as esconde
-            checklistData.forEach((category, catIndex) => {
+            checklistData.forEach((category, index) => {
                 const option = document.createElement('option');
-                option.value = catIndex;
+                option.value = index;
                 option.textContent = category.category;
                 categorySelect.appendChild(option);
 
@@ -279,7 +275,7 @@
                 }
                 displayCurrentQuestion();
             });
-            displayCurrentQuestion(); // Mostra a primeira pergunta
+            displayCurrentQuestion();
         };
         
         document.addEventListener('click', (e) => {
@@ -312,15 +308,20 @@
         });
 
         const calculateScore = () => {
-            let totalQuestions = 0, conformeCount = 0, naCount = 0;
-            checklistData.forEach(cat => cat.questions.forEach(q => {
-                totalQuestions++;
-                const selected = document.querySelector(`input[name="${q.id}"]:checked`);
-                if(selected) {
-                    if (selected.value === 'Conforme') conformeCount++;
-                    if (selected.value === 'Não se Aplica') naCount++;
+            let totalQuestions = checklistData.flatMap(c => c.questions).length;
+            let conformeCount = 0;
+            let naCount = 0;
+            
+            for (const category of checklistData) {
+                for (const question of category.questions) {
+                    const answerEl = document.querySelector(`input[name="${question.id}"]:checked`);
+                    if (answerEl) {
+                        if (answerEl.value === 'Conforme') conformeCount++;
+                        if (answerEl.value === 'Não se Aplica') naCount++;
+                    }
                 }
-            }));
+            }
+            
             const applicable = totalQuestions - naCount;
             const score = applicable > 0 ? (conformeCount / applicable) * 10 : 10;
             
@@ -456,7 +457,7 @@
 
 ### Passo 2: Crie/Atualize o arquivo `manifest.webmanifest`
 
-No seu repositório do GitHub, crie um novo arquivo chamado `manifest.webmanifest` (ou edite o existente) e cole o conteúdo abaixo.
+Se você já criou o arquivo no GitHub, **substitua o conteúdo dele** por este abaixo. Se não criou, crie um novo arquivo com o nome `manifest.webmanifest` e cole este código.
 
 
 ```json
