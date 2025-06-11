@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>App de Auditoria Sanitária</title>
+    <title>App de Auditoria Sanitária - V8</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
@@ -14,7 +14,6 @@
         body { font-family: 'Inter', sans-serif; }
         .step, .category-content, .non-conformity-section, .photo-preview, #main-header { display: none; }
         .step.active, .category-content.active, .non-conformity-section.visible, .photo-preview.visible, #main-header.active { display: flex; }
-        /* Ajuste para o .category-content, que deve ser block */
         .category-content.active { display: block; }
 
         .signature-pad { border: 2px dashed #d1d5db; border-radius: 0.5rem; cursor: crosshair; }
@@ -34,7 +33,7 @@
     <div class="container mx-auto max-w-4xl p-4 sm:p-6 md:p-8">
         
         <header id="main-header" class="bg-white p-4 sm:p-6 rounded-xl shadow-md mb-8 flex-col sm:flex-row justify-between items-center">
-            <div>
+            <div class="text-center sm:text-left">
                 <h1 class="text-xl sm:text-2xl font-bold text-gray-900">Auditoria Sanitária</h1>
                 <p id="header-subtitle" class="text-gray-600"></p>
             </div>
@@ -83,19 +82,22 @@
             <!-- Etapa 2: Checklist -->
             <div id="step-2" class="step">
                 <div class="bg-white p-6 rounded-xl shadow-md">
-                    <div class="mb-6">
+                    <div class="mb-4">
                         <label for="category-select" class="block text-sm font-bold text-gray-700 mb-2">SELECIONE A CATEGORIA</label>
                         <select id="category-select" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50 text-base">
-                            <!-- Opções geradas pelo JS -->
                         </select>
                     </div>
                     <div id="checklist-content-container">
-                        <!-- Perguntas geradas pelo JS -->
+                    </div>
+                    <!-- Botões de navegação de categoria -->
+                    <div id="category-nav-buttons" class="mt-6 flex justify-between">
+                        <button id="prev-category-btn" class="bg-gray-300 text-gray-800 font-bold py-2 px-5 rounded-lg hover:bg-gray-400 transition-colors">Anterior</button>
+                        <button id="next-category-btn" class="bg-blue-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-blue-700 transition-colors">Próxima</button>
                     </div>
                 </div>
                  <div class="mt-8 flex justify-between">
-                    <button data-prev-step="1" class="bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-lg hover:bg-gray-400">Anterior</button>
-                    <button data-next-step="3" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 shadow-lg">Finalizar e Ver Resultado</button>
+                    <button data-prev-step="1" class="bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-lg hover:bg-gray-400">Voltar</button>
+                    <button data-next-step="3" class="bg-green-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-green-700 shadow-lg">Finalizar e Ver Resultado</button>
                 </div>
             </div>
 
@@ -155,6 +157,9 @@
         let signaturePadResponsible, signaturePadAuditor;
         const mainHeader = document.getElementById('main-header');
         const headerSubtitle = document.getElementById('header-subtitle');
+        const categorySelect = document.getElementById('category-select');
+        const prevCategoryBtn = document.getElementById('prev-category-btn');
+        const nextCategoryBtn = document.getElementById('next-category-btn');
 
         const navigateToStep = (stepNumber) => {
             document.querySelectorAll('.step').forEach(step => step.classList.remove('active'));
@@ -179,7 +184,6 @@
         };
 
         const generateChecklistHTML = () => {
-            const categorySelect = document.getElementById('category-select');
             const checklistContentContainer = document.getElementById('checklist-content-container');
             
             checklistData.forEach((category, index) => {
@@ -192,6 +196,7 @@
             const showCategory = (index) => {
                 checklistContentContainer.innerHTML = '';
                 const category = checklistData[index];
+                categorySelect.value = index; // Sincroniza o menu dropdown
                 const categoryContent = document.createElement('div');
                 categoryContent.className = 'category-content active space-y-4';
                 categoryContent.dataset.categoryIndex = index;
@@ -200,15 +205,22 @@
                     const questionWrapper = document.createElement('div');
                     questionWrapper.id = `wrapper-${question.id}`;
                     questionWrapper.className = 'py-4 border-b last:border-b-0';
-                    questionWrapper.innerHTML = `<p class="font-medium text-gray-700">${question.text}</p><div class="flex flex-wrap gap-4 mt-2">${['Conforme', 'Não Conforme', 'Não se Aplica'].map(opt => `<label class="flex items-center space-x-2 cursor-pointer"><input type="radio" name="${question.id}" value="${opt}" class="form-radio h-5 w-5 text-blue-600" data-question-id="${question.id}"><span>${opt}</span></label>`).join('')}</div><div id="nc-${question.id}" class="non-conformity-section mt-4 p-4 rounded-lg"><label class="block text-sm font-medium text-red-700 mb-1">Descreva a não conformidade:</label><textarea class="w-full px-3 py-2 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500" rows="3"></textarea><label class="mt-2 cursor-pointer inline-block bg-red-500 text-white text-sm font-semibold py-2 px-4 rounded-md hover:bg-red-600">Anexar Foto<input type="file" accept="image/*" class="hidden" data-preview-id="preview-${question.id}"></label><img id="preview-${question.id}" class="photo-preview"/></div>`;
+                    questionWrapper.innerHTML = `<p class="font-medium text-gray-700">${question.text}</p><div class="flex flex-wrap gap-x-6 gap-y-2 mt-2">${['Conforme', 'Não Conforme', 'Não se Aplica'].map(opt => `<label class="flex items-center space-x-2 cursor-pointer"><input type="radio" name="${question.id}" value="${opt}" class="form-radio h-5 w-5 text-blue-600" data-question-id="${question.id}"><span>${opt}</span></label>`).join('')}</div><div id="nc-${question.id}" class="non-conformity-section mt-4 p-4 rounded-lg"><label class="block text-sm font-medium text-red-700 mb-1">Descreva a não conformidade:</label><textarea class="w-full px-3 py-2 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500" rows="3"></textarea><label class="mt-2 cursor-pointer inline-block bg-red-500 text-white text-sm font-semibold py-2 px-4 rounded-md hover:bg-red-600">Anexar Foto<input type="file" accept="image/*" class="hidden" data-preview-id="preview-${question.id}"></label><img id="preview-${question.id}" class="photo-preview"/></div>`;
                     categoryContent.appendChild(questionWrapper);
                 });
                 checklistContentContainer.appendChild(categoryContent);
             };
 
-            categorySelect.addEventListener('change', (e) => {
-                showCategory(e.target.value);
+            categorySelect.addEventListener('change', (e) => showCategory(e.target.value));
+            prevCategoryBtn.addEventListener('click', () => {
+                let currentIndex = parseInt(categorySelect.value);
+                if (currentIndex > 0) showCategory(currentIndex - 1);
             });
+            nextCategoryBtn.addEventListener('click', () => {
+                let currentIndex = parseInt(categorySelect.value);
+                if (currentIndex < checklistData.length - 1) showCategory(currentIndex + 1);
+            });
+            
             showCategory(0);
         };
         
