@@ -218,6 +218,11 @@ auth.onAuthStateChanged(async user => {
   if (user) {
     const snap = await db.collection("usuarios").doc(user.uid).get();
     currentUserData = snap.exists ? snap.data() : {};
+    if (currentUserData.ativo !== true) {
+      alert("Seu cadastro ainda não foi autorizado. Aguarde liberação.");
+      await auth.signOut();
+      return;
+    }
     userInfoEl.textContent = currentUserData.nome ? `${currentUserData.nome} – CRN: ${currentUserData.crn}` : '';
     authContainer.style.display = "none";
     appContainer.style.display = "block";
@@ -227,12 +232,23 @@ auth.onAuthStateChanged(async user => {
   }
 });
 
-loginForm.addEventListener("submit", e => {
+loginForm.addEventListener("submit", async e => {
   e.preventDefault();
-  auth.signInWithEmailAndPassword(
-    document.getElementById("login-email").value,
-    document.getElementById("login-password").value
-  ).catch(err => alert(err.message));
+  const email = document.getElementById("login-email").value;
+  const password = document.getElementById("login-password").value;
+  try {
+    const cred = await auth.signInWithEmailAndPassword(email, password);
+    const docSnap = await db.collection("usuarios").doc(cred.user.uid).get();
+    const data = docSnap.exists ? docSnap.data() : {};
+    if (data.ativo !== true) {
+      alert("Seu cadastro ainda não foi autorizado. Aguarde liberação.");
+      await auth.signOut();
+      return;
+    }
+    // onAuthStateChanged handler will show the painel
+  } catch (err) {
+    alert(err.message);
+  }
 });
 
 registerForm.addEventListener("submit", e => {
