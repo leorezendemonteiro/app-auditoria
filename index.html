@@ -475,8 +475,19 @@ function populateActionPlan() {
             if (ans && ans.value === "Não Conforme") {
                 const div = document.createElement("div");
                 div.className = "mb-4";
-                div.innerHTML = `<p class="font-medium">${q.text}</p>
+                div.innerHTML = `
+                    <p class="font-medium">${q.text}</p>
                     <textarea data-q="${q.id}" class="w-full px-3 py-2 border border-gray-300 rounded-lg mt-2" placeholder="Justificativa"></textarea>
+                    <div class="flex gap-4 mt-2">
+                        <input type="date" data-start class="border rounded p-2 flex-1">
+                        <input type="date" data-end class="border rounded p-2 flex-1">
+                    </div>`;
+                container.appendChild(div);
+            }
+        });
+    });
+}
+
 async function saveAudit() {
     if(!auth.currentUser) return;
     const responses = {};
@@ -496,6 +507,7 @@ async function saveAudit() {
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 }
+
 async function saveActionPlan() {
     if(!auth.currentUser || !actionPlanData.length) return;
     await db.collection('planosAcao').add({
@@ -504,6 +516,7 @@ async function saveActionPlan() {
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 }
+
 function generateActionPlanPDF() {
     const doc = new jsPDF();
     let y = 20;
@@ -519,6 +532,7 @@ function generateActionPlanPDF() {
     const name = `PlanoAcao-${(document.getElementById('establishment_name').value || 'Auditoria').replace(/[^a-z0-9]/gi,'_')}.pdf`;
     doc.save(name);
 }
+
 document.getElementById("action-plan-next").addEventListener("click", () => {
     actionPlanData = [];
     document.querySelectorAll("#action-plan-container > div").forEach(div => {
@@ -531,15 +545,6 @@ document.getElementById("action-plan-next").addEventListener("click", () => {
     });
     navigateToStep(4);
 });
-                    <div class="flex gap-4 mt-2">
-                        <input type="date" data-start class="border rounded p-2 flex-1">
-                        <input type="date" data-end class="border rounded p-2 flex-1">
-                    </div>`;
-                container.appendChild(div);
-            }
-        });
-    });
-}
         document.getElementById('generate-pdf-btn').addEventListener('click', async () => {
             navigateToStep(5);
             
