@@ -241,8 +241,19 @@ registerForm.addEventListener("submit", e => {
   const email = document.getElementById("reg-email").value;
   const crn = document.getElementById("reg-crn").value;
   const senha = document.getElementById("reg-password").value;
-  auth.createUserWithEmailAndPassword(email, senha)
-    .then(cred => db.collection("usuarios").doc(cred.user.uid).set({ nome, email, crn }))
+  auth
+    .createUserWithEmailAndPassword(email, senha)
+    .then(cred =>
+      db.collection("usuarios")
+        .doc(cred.user.uid)
+        .set({ nome, email, crn })
+    )
+    .then(() => {
+      alert("Conta criada com sucesso!");
+      registerForm.reset();
+      registerForm.classList.add("hidden");
+      loginForm.classList.remove("hidden");
+    })
     .catch(err => alert(err.message));
 });
 
@@ -377,11 +388,12 @@ showLogin.addEventListener("click", () => {
             if (e.target.matches('[data-clear-for]')) {
                 const padId = e.target.dataset.clearFor;
                 const canvas = document.getElementById(padId);
-                if(padId === "signature-pad-responsible" && signaturePadResponsible) signaturePadResponsible.clear();
-                if(padId === "signature-pad-auditor" && signaturePadAuditor) signaturePadAuditor.clear();
-                if(canvas) canvas.dataset.signature = "";
+                if (padId === "signature-pad-responsible" && signaturePadResponsible) signaturePadResponsible.clear();
+                if (padId === "signature-pad-auditor" && signaturePadAuditor) signaturePadAuditor.clear();
+                if (canvas) canvas.dataset.signature = "";
+            }
             if (e.target.matches("#ask-action-plan-btn")) {
-                const hasNC = document.querySelectorAll("input[value="Não Conforme"]:checked").length > 0;
+                const hasNC = document.querySelectorAll("input[value=\"Não Conforme\"]:checked").length > 0;
                 if (hasNC && confirm("Deseja gerar um Plano de Ação para os itens Não Conformes?")) {
                     populateActionPlan();
                     navigateToStep(6);
@@ -389,7 +401,7 @@ showLogin.addEventListener("click", () => {
                     navigateToStep(4);
                 }
             }
-            }
+        });
         
         document.querySelector('main').addEventListener('change', function(e) {
             if (e.target.matches('input[type="radio"]')) {
