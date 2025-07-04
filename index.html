@@ -198,7 +198,7 @@ import { getFirestore, collection, doc, getDoc, setDoc, addDoc, serverTimestamp 
           apiKey: "AIzaSyDiD0Qs5GAp-VZ0WYwx-543ruoF08MEYfg",
           authDomain: "auditoria-trakto.firebaseapp.com",
           projectId: "auditoria-trakto",
-          storageBucket: "auditoria-trakto.firebasestorage.app",
+          storageBucket: "auditoria-trakto.appspot.com",
           messagingSenderId: "378139674082",
           appId: "1:378139674082:web:8aa3e5c8819cfa797ae5bb"
         };
@@ -218,7 +218,7 @@ import { getFirestore, collection, doc, getDoc, setDoc, addDoc, serverTimestamp 
 onAuthStateChanged(auth, async user => {
   if (user) {
     const snap = await getDoc(doc(db, "usuarios", user.uid));
-    currentUserData = snap.exists ? snap.data() : {};
+    currentUserData = snap.exists() ? snap.data() : {};
     if (currentUserData.ativo !== true) {
       alert("Seu cadastro ainda não foi autorizado. Aguarde liberação.");
       await signOut(auth);
@@ -240,7 +240,7 @@ loginForm.addEventListener("submit", async e => {
   try {
     const cred = await signInWithEmailAndPassword(auth, email, password);
     const docSnap = await getDoc(doc(db, "usuarios", cred.user.uid));
-    const data = docSnap.exists ? docSnap.data() : {};
+    const data = docSnap.exists() ? docSnap.data() : {};
     if (data.ativo !== true) {
       alert("Seu cadastro ainda não foi autorizado. Aguarde liberação.");
       await signOut(auth);
