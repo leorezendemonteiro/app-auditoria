@@ -182,7 +182,7 @@
             <!-- Etapa 5: Loader -->
             <div id="step-5" class="step justify-center items-center flex-col text-center py-10 w-full">
                  <div id="loader" class="mx-auto"></div>
-                 <p class="mt-4 text-lg font-semibold text-gray-700">Gerando seu relatório...</p>
+                 <p id="loader-status" class="mt-4 text-lg font-semibold text-gray-700">Gerando relatório...</p>
                  <p class="text-gray-500">Isso pode levar alguns segundos.</p>
             </div>
         </main>
@@ -465,10 +465,10 @@ showLogin.addEventListener("click", () => {
             const alertEl = document.getElementById('score-alert');
             const displayEl = document.getElementById('score-display');
             scoreEl.textContent = score.toFixed(1);
-            displayEl.className = 'text-center p-8 rounded-lg';
-            if (score <= 5.9) { alertEl.textContent = 'ALERTA VERMELHO'; displayEl.classList.add('bg-red-100', 'text-red-800'); }
-            else if (score <= 7.9) { alertEl.textContent = 'ALERTA AMARELO'; displayEl.classList.add('bg-yellow-100', 'text-yellow-800'); }
-            else { alertEl.textContent = 'ALERTA VERDE'; displayEl.classList.add('bg-green-100', 'text-green-800'); }
+            displayEl.className = 'text-center p-8 rounded-lg font-bold text-white';
+            if (score <= 5.9) { alertEl.textContent = 'ALERTA VERMELHO'; displayEl.classList.add('bg-red-500'); }
+            else if (score <= 7.9) { alertEl.textContent = 'ALERTA AMARELO'; displayEl.classList.add('bg-yellow-500'); }
+            else { alertEl.textContent = 'ALERTA VERDE'; displayEl.classList.add('bg-green-500'); }
         };
 
         function initializeSignaturePads() {
@@ -499,9 +499,15 @@ function populateActionPlan() {
                 div.innerHTML = `
                     <p class="font-medium">${q.text}</p>
                     <textarea data-q="${q.id}" class="w-full px-3 py-2 border border-gray-300 rounded-lg mt-2" placeholder="Justificativa"></textarea>
-                    <div class="flex gap-4 mt-2">
-                        <input type="date" data-start class="border rounded p-2 flex-1">
-                        <input type="date" data-end class="border rounded p-2 flex-1">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                        <div>
+                            <label class="text-sm font-medium">Data de Início</label>
+                            <input type="date" data-start class="border rounded p-2 w-full">
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium">Data de Término</label>
+                            <input type="date" data-end class="border rounded p-2 w-full">
+                        </div>
                     </div>`;
                 container.appendChild(div);
             }
@@ -554,36 +560,37 @@ function generateActionPlanPDF() {
 
     doc.setFontSize(11).setFont('helvetica', 'normal');
     const estName = document.getElementById('establishment_name').value;
-    const estAddr = document.getElementById('establishment_address').value;
-    const auditDate = new Date(document.getElementById('inspection_date').value).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+    const auditDate = new Date().toLocaleDateString('pt-BR');
     const auditor = currentUserData?.nome || '';
     const crn = currentUserData?.crn || '';
-    doc.text(`Estabelecimento: ${estName}`, 20, y + 12);
-    doc.text(`Endereço: ${estAddr}`, 20, y + 18);
-    doc.text(`Data: ${auditDate}`, 20, y + 24);
+    doc.text(`Cliente: ${estName}`, 20, y + 12);
+    doc.text(`Data da Auditoria: ${auditDate}`, 20, y + 18);
     doc.text(`Auditor: ${auditor}`, pageWidth/2 + 10, y + 12);
     doc.text(`CRN: ${crn}`, pageWidth/2 + 10, y + 18);
 
     y += 32;
 
-    actionPlanData.forEach(item => {
+    actionPlanData.forEach((item, idx) => {
         if(y > 250){ doc.addPage(); y = 15; }
-        doc.setDrawColor(200);
-        doc.roundedRect(15, y - 2, pageWidth - 30, 26, 2, 2);
-        const textY = y + 4;
-        doc.setFont('helvetica', 'bold');
         const qText = doc.splitTextToSize(item.question, pageWidth - 40);
-        doc.text(qText, 20, textY);
-        let offset = textY + qText.length * 5;
-        doc.setFont('helvetica', 'normal');
         const justText = doc.splitTextToSize('Justificativa: ' + item.justification, pageWidth - 40);
-        doc.text(justText, 20, offset);
-        offset += justText.length * 5;
-        doc.text(`Início: ${item.inicio}`, 20, offset);
-        doc.text(`Término: ${item.termino}`, pageWidth/2 + 10, offset);
-        y = offset + 8;
-        doc.line(15, y, pageWidth - 15, y);
-        y += 4;
+        let boxHeight = 8 + qText.length*5 + justText.length*5;
+        if(idx % 2 === 1){
+            doc.setFillColor(245,245,245);
+            doc.rect(15, y - 2, pageWidth - 30, boxHeight, 'F');
+        }
+        doc.setDrawColor(200);
+        doc.roundedRect(15, y - 2, pageWidth - 30, boxHeight, 2, 2);
+        let textY = y + 4;
+        doc.setFont('helvetica','bold');
+        doc.text(qText, 20, textY);
+        textY += qText.length*5;
+        doc.setFont('helvetica','normal');
+        doc.text(justText, 20, textY);
+        textY += justText.length*5;
+        doc.text(`Início: ${item.inicio}`, 20, textY);
+        doc.text(`Término: ${item.termino}`, pageWidth/2 + 10, textY);
+        y += boxHeight + 4;
     });
 
     const footerY = doc.internal.pageSize.getHeight() - 10;
@@ -610,7 +617,11 @@ document.getElementById("action-plan-next").addEventListener("click", async () =
     await saveActionPlan(pdfData);
     navigateToStep(4);
 });
-        document.getElementById('generate-pdf-btn').addEventListener('click', async () => {
+        const generateBtn = document.getElementById('generate-pdf-btn');
+        const loaderStatus = document.getElementById('loader-status');
+        generateBtn.addEventListener('click', async () => {
+            generateBtn.disabled = true;
+            loaderStatus.textContent = '⏳ Gerando relatório...';
             navigateToStep(5);
             
             const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
@@ -694,13 +705,14 @@ document.getElementById("action-plan-next").addEventListener("click", async () =
                 };
             
             addSignature(document.getElementById('signature-pad-responsible'), 'Assinatura do Responsável', 25);
-                doc.setFontSize(12).text(`ResponsÃ¡vel tÃ©cnico: ${currentUserData?.nome || ""} – CRN: ${currentUserData?.crn || ""}`, 15, y + 45);
+            addSignature(document.getElementById('signature-pad-auditor'), 'Assinatura do Auditor', 120);
+                doc.setFontSize(12).text(`Auditor: ${currentUserData?.nome || ''} – CRN: ${currentUserData?.crn || ''}`, 105, y + 45, { align: 'center' });
             
             await saveAudit();
             const fileName = `Relatorio-${(document.getElementById('establishment_name').value || 'Auditoria').replace(/[^a-z0-9]/gi, '_')}.pdf`;
             doc.save(fileName);
-            
-            navigateToStep(4);
+            loaderStatus.textContent = '✅ Auditoria finalizada. O relatório foi gerado com sucesso!';
+            setTimeout(() => navigateToStep(4), 2000);
         });
 
         window.onload = () => {
