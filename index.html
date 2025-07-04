@@ -529,32 +529,74 @@ async function saveAudit() {
     });
 }
 
-async function saveActionPlan() {
+async function saveActionPlan(pdfData) {
     if(!auth.currentUser || !actionPlanData.length) return;
     await addDoc(collection(db, 'planosAcao'), {
         uid: auth.currentUser.uid,
         itens: actionPlanData,
+        pdf: pdfData || null,
         createdAt: serverTimestamp()
     });
 }
 
 function generateActionPlanPDF() {
-    const doc = new jsPDF();
-    let y = 20;
-    doc.setFontSize(16).text('Plano de Ação', 105, y, null, null, 'center');
-    y += 10;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 15;
+
+    const logo = document.getElementById('company-logo-header');
+    if (logo) doc.addImage(logo, 'JPEG', pageWidth - 35, y - 5, 20, 20);
+
+    doc.setFillColor(235, 240, 255);
+    doc.rect(15, y - 5, pageWidth - 30, 25, 'F');
+    doc.setFont('helvetica', 'bold').setFontSize(18);
+    doc.text('Plano de Ação', pageWidth / 2, y + 5, { align: 'center' });
+
+    doc.setFontSize(11).setFont('helvetica', 'normal');
+    const estName = document.getElementById('establishment_name').value;
+    const estAddr = document.getElementById('establishment_address').value;
+    const auditDate = new Date(document.getElementById('inspection_date').value).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+    const auditor = currentUserData?.nome || '';
+    const crn = currentUserData?.crn || '';
+    doc.text(`Estabelecimento: ${estName}`, 20, y + 12);
+    doc.text(`Endereço: ${estAddr}`, 20, y + 18);
+    doc.text(`Data: ${auditDate}`, 20, y + 24);
+    doc.text(`Auditor: ${auditor}`, pageWidth/2 + 10, y + 12);
+    doc.text(`CRN: ${crn}`, pageWidth/2 + 10, y + 18);
+
+    y += 32;
+
     actionPlanData.forEach(item => {
-        doc.setFontSize(12).text(item.question, 15, y); y += 6;
-        doc.text('Justificativa: ' + item.justification, 15, y); y += 6;
-        doc.text(`Início: ${item.inicio}  Término: ${item.termino}`, 15, y); y += 10;
-        if(y>270){ doc.addPage(); y=20; }
+        if(y > 250){ doc.addPage(); y = 15; }
+        doc.setDrawColor(200);
+        doc.roundedRect(15, y - 2, pageWidth - 30, 26, 2, 2);
+        const textY = y + 4;
+        doc.setFont('helvetica', 'bold');
+        const qText = doc.splitTextToSize(item.question, pageWidth - 40);
+        doc.text(qText, 20, textY);
+        let offset = textY + qText.length * 5;
+        doc.setFont('helvetica', 'normal');
+        const justText = doc.splitTextToSize('Justificativa: ' + item.justification, pageWidth - 40);
+        doc.text(justText, 20, offset);
+        offset += justText.length * 5;
+        doc.text(`Início: ${item.inicio}`, 20, offset);
+        doc.text(`Término: ${item.termino}`, pageWidth/2 + 10, offset);
+        y = offset + 8;
+        doc.line(15, y, pageWidth - 15, y);
+        y += 4;
     });
-    doc.text(`Responsável técnico: ${currentUserData?.nome || ''} – CRN: ${currentUserData?.crn || ''}`, 15, 285);
-    const name = `PlanoAcao-${(document.getElementById('establishment_name').value || 'Auditoria').replace(/[^a-z0-9]/gi,'_')}.pdf`;
+
+    const footerY = doc.internal.pageSize.getHeight() - 10;
+    doc.setFontSize(11).setFont('helvetica', 'normal');
+    doc.text(`Responsável técnico: ${auditor} – CRN: ${crn}`, 15, footerY);
+
+    const name = `PlanoAcao-${(estName || 'Auditoria').replace(/[^a-z0-9]/gi,'_')}.pdf`;
+    const dataUri = doc.output('datauristring');
     doc.save(name);
+    return dataUri;
 }
 
-document.getElementById("action-plan-next").addEventListener("click", () => {
+document.getElementById("action-plan-next").addEventListener("click", async () => {
     actionPlanData = [];
     document.querySelectorAll("#action-plan-container > div").forEach(div => {
         actionPlanData.push({
@@ -564,6 +606,8 @@ document.getElementById("action-plan-next").addEventListener("click", () => {
             termino: div.querySelector("[data-end]").value
         });
     });
+    const pdfData = generateActionPlanPDF();
+    await saveActionPlan(pdfData);
     navigateToStep(4);
 });
         document.getElementById('generate-pdf-btn').addEventListener('click', async () => {
@@ -653,10 +697,6 @@ document.getElementById("action-plan-next").addEventListener("click", () => {
                 doc.setFontSize(12).text(`ResponsÃ¡vel tÃ©cnico: ${currentUserData?.nome || ""} – CRN: ${currentUserData?.crn || ""}`, 15, y + 45);
             
             await saveAudit();
-            if(actionPlanData.length){
-                generateActionPlanPDF();
-                await saveActionPlan();
-            }
             const fileName = `Relatorio-${(document.getElementById('establishment_name').value || 'Auditoria').replace(/[^a-z0-9]/gi, '_')}.pdf`;
             doc.save(fileName);
             
