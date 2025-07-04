@@ -252,23 +252,30 @@ loginForm.addEventListener("submit", async e => {
   }
 });
 
-registerForm.addEventListener("submit", e => {
+registerForm.addEventListener("submit", async e => {
   e.preventDefault();
-  const nome = document.getElementById("reg-name").value;
-  const email = document.getElementById("reg-email").value;
-  const crn = document.getElementById("reg-crn").value;
+
+  const nome = document.getElementById("reg-name").value.trim();
+  const email = document.getElementById("reg-email").value.trim();
+  const crn = document.getElementById("reg-crn").value.trim();
   const senha = document.getElementById("reg-password").value;
-    createUserWithEmailAndPassword(auth, email, senha)
-      .then(cred =>
-        setDoc(doc(db, "usuarios", cred.user.uid), { nome, email, crn, ativo: false })
-      )
-    .then(() => {
-      alert("Conta criada com sucesso!");
-      registerForm.reset();
-      registerForm.classList.add("hidden");
-      loginForm.classList.remove("hidden");
-    })
-    .catch(err => alert(err.message));
+
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, senha);
+    await setDoc(doc(db, "usuarios", cred.user.uid), {
+      nome,
+      email,
+      crn,
+      ativo: false,
+    });
+
+    alert("Conta criada com sucesso!");
+    registerForm.reset();
+    registerForm.classList.add("hidden");
+    loginForm.classList.remove("hidden");
+  } catch (err) {
+    alert(err.message);
+  }
 });
 
 showRegister.addEventListener("click", () => {
