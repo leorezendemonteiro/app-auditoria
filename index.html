@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>App de Auditoria Sanitária</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -860,31 +860,34 @@ document.getElementById("action-plan-next").addEventListener("click", async () =
 
 async function loadPendingAudits(){
     if(!auth.currentUser) return;
-    const q = query(collection(db,'auditorias'), where('uid','==',auth.currentUser.uid), where('actionPlanGenerated','==',false), orderBy('createdAt','desc'));
+    const q = query(collection(db,'auditorias'), where('uid','==',auth.currentUser.uid));
     const snap = await getDocs(q);
     const container = document.getElementById('pending-plans');
     container.innerHTML = '';
-    if(snap.empty){
+    const docs = snap.docs.map(d=>({id:d.id,...d.data()}))
+        .filter(d=>d.actionPlanGenerated===false)
+        .sort((a,b)=> (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+    if(docs.length===0){
         document.getElementById('no-pending').classList.remove('hidden');
         return;
     }
     document.getElementById('no-pending').classList.add('hidden');
-    snap.forEach(docu=>{
-        const d = docu.data();
+    docs.forEach(d=>{
         const div = document.createElement('div');
         div.className='bg-white p-4 rounded shadow flex justify-between items-center';
-        div.innerHTML=`<div><p class='font-medium'>${d.razaoSocial}</p><p class='text-sm text-gray-500'>${new Date(d.data).toLocaleDateString('pt-BR')}</p></div><button data-gen-plan='${docu.id}' class='bg-blue-600 text-white px-4 py-2 rounded'>Gerar Plano de Ação</button>`;
+        div.innerHTML=`<div><p class='font-medium'>${d.razaoSocial}</p><p class='text-sm text-gray-500'>${new Date(d.data).toLocaleDateString('pt-BR')}</p></div><button data-gen-plan='${d.id}' class='bg-blue-600 text-white px-4 py-2 rounded'>Gerar Plano de Ação</button>`;
         container.appendChild(div);
     });
 }
 
 async function loadMyAudits(){
     if(!auth.currentUser) return;
-    const q = query(collection(db,'auditorias'), where('uid','==',auth.currentUser.uid), orderBy('createdAt','desc'));
+    const q = query(collection(db,'auditorias'), where('uid','==',auth.currentUser.uid));
     const snap = await getDocs(q);
     const container = document.getElementById('my-audits');
     container.innerHTML='';
-    snap.forEach(docu=>{
+    const docs = snap.docs.sort((a,b)=>(b.data().createdAt?.seconds||0)-(a.data().createdAt?.seconds||0));
+    docs.forEach(docu=>{
         const d=docu.data();
         const div=document.createElement('div');
         div.className='bg-white p-4 rounded shadow space-y-2';
