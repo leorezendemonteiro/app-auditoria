@@ -221,6 +221,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
 import { getFirestore, collection, doc, getDoc, setDoc, addDoc, getDocs, query, where, orderBy, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js";
 
         const firebaseConfig = {
           apiKey: "AIzaSyDiD0Qs5GAp-VZ0WYwx-543ruoF08MEYfg",
@@ -233,6 +234,7 @@ import { getFirestore, collection, doc, getDoc, setDoc, addDoc, getDocs, query, 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        const storage = getStorage(app);
         let currentUserData = null;
         const authContainer = document.getElementById("auth-container");
         const appContainer = document.getElementById("app-container");
@@ -495,14 +497,14 @@ showRegister.addEventListener("click", () => {
             }
             if(e.target.matches('[data-view-audit]')){
                 const snap = await getDoc(doc(db,'auditorias',e.target.dataset.viewAudit));
-                if(snap.exists() && snap.data().pdf){
-                    window.open(snap.data().pdf, '_blank');
+                if(snap.exists() && snap.data().pdfUrl){
+                    window.open(snap.data().pdfUrl, '_blank');
                 }
             }
             if(e.target.matches('[data-view-plan]')){
                 const snap = await getDoc(doc(db,'planosAcao',e.target.dataset.viewPlan));
-                if(snap.exists() && snap.data().pdf){
-                    window.open(snap.data().pdf, '_blank');
+                if(snap.exists() && snap.data().pdfUrl){
+                    window.open(snap.data().pdfUrl, '_blank');
                 }
             }
         });
@@ -622,6 +624,14 @@ async function saveAudit(pdfData) {
             responses[q.id] = a ? a.value : '';
         });
     });
+    let pdfUrl = null;
+    if(pdfData){
+        const sanitizedRazao = clienteRazao.replace(/[^a-z0-9]/gi, '_');
+        const inspDate = document.getElementById('inspection_date').value;
+        const storageRef = ref(storage, `auditorias_pdf/${sanitizedRazao}_${inspDate}.pdf`);
+        await uploadString(storageRef, pdfData, 'data_url');
+        pdfUrl = await getDownloadURL(storageRef);
+    }
     const docRef = await addDoc(collection(db, 'auditorias'), {
         uid: auth.currentUser.uid,
         estabelecimento: document.getElementById('establishment_name').value,
@@ -632,7 +642,7 @@ async function saveAudit(pdfData) {
         razaoSocial: clienteRazao,
         responsavelNome,
         responsavelCargo,
-        pdf: pdfData || null,
+        pdfUrl,
         actionPlanGenerated: false,
         respostas: responses,
         createdAt: serverTimestamp()
@@ -642,11 +652,19 @@ async function saveAudit(pdfData) {
 
 async function saveActionPlan(auditId, pdfData) {
     if(!auth.currentUser || !actionPlanData.length || !auditId) return;
+    let pdfUrl = null;
+    if(pdfData){
+        const sanitizedRazao = clienteRazao.replace(/[^a-z0-9]/gi, '_');
+        const inspDate = document.getElementById('inspection_date').value;
+        const storageRef = ref(storage, `auditorias_pdf/${sanitizedRazao}_${inspDate}_plano.pdf`);
+        await uploadString(storageRef, pdfData, 'data_url');
+        pdfUrl = await getDownloadURL(storageRef);
+    }
     const planRef = await addDoc(collection(db, 'planosAcao'), {
         uid: auth.currentUser.uid,
         auditId,
         itens: actionPlanData,
-        pdf: pdfData || null,
+        pdfUrl,
         createdAt: serverTimestamp()
     });
     await updateDoc(doc(db, 'auditorias', auditId), { actionPlanGenerated: true, actionPlanId: planRef.id });
@@ -871,7 +889,7 @@ async function loadMyAudits(){
         const div=document.createElement('div');
         div.className='bg-white p-4 rounded shadow space-y-2';
         let html=`<p class='font-medium'>${d.razaoSocial}</p><p class='text-sm text-gray-500'>${new Date(d.data).toLocaleDateString('pt-BR')}</p>`;
-        if(d.pdf){
+        if(d.pdfUrl){
             html+=`<button data-view-audit='${docu.id}' class='bg-green-600 text-white px-3 py-1 rounded mr-2'>Visualizar PDF da Auditoria</button>`;
         }
         if(d.actionPlanGenerated){
