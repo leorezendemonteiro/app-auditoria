@@ -75,8 +75,8 @@
 
         <nav id="tab-buttons" class="flex justify-around mb-6">
             <button data-tab="tab-new" class="tab-btn border-b-2 border-blue-600 text-blue-600 px-2 py-1">Nova Auditoria</button>
+            <button data-tab="tab-history" class="tab-btn border-b-2 border-transparent px-2 py-1">Histórico</button>
             <button data-tab="tab-action" class="tab-btn border-b-2 border-transparent px-2 py-1">Plano de Ação</button>
-            <button data-tab="tab-my" class="tab-btn border-b-2 border-transparent px-2 py-1">Minhas Auditorias</button>
         </nav>
 
         <main>
@@ -204,13 +204,14 @@
         </div>
         <!-- end tab-new -->
 
+        <div id="tab-history" class="tab-content">
+            <div id="history-list" class="space-y-4"></div>
+            <p id="no-history" class="text-center text-gray-600 hidden">Nenhum arquivo encontrado.</p>
+        </div>
+
         <div id="tab-action" class="tab-content">
             <div id="pending-plans" class="space-y-4"></div>
             <p id="no-pending" class="text-center text-gray-600 hidden">Nenhum plano de ação pendente.</p>
-        </div>
-
-        <div id="tab-my" class="tab-content">
-            <div id="my-audits" class="space-y-4"></div>
         </div>
 
         </main>
@@ -221,7 +222,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
 import { getFirestore, collection, doc, getDoc, setDoc, addDoc, getDocs, query, where, orderBy, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js";
+import { getStorage, ref, uploadString, getDownloadURL, listAll, getMetadata } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js";
 
         const firebaseConfig = {
           apiKey: "AIzaSyDiD0Qs5GAp-VZ0WYwx-543ruoF08MEYfg",
@@ -274,7 +275,7 @@ onAuthStateChanged(auth, async user => {
       authContainer.style.display = "none";
       appContainer.style.display = "block";
       loadPendingAudits();
-      loadMyAudits();
+      loadHistory();
     } else {
     appContainer.style.display = "none";
     authContainer.style.display = "flex";
@@ -626,11 +627,13 @@ async function saveAudit(pdfData) {
     });
     let pdfUrl = null;
     if(pdfData){
-        const sanitizedRazao = clienteRazao.replace(/[^a-z0-9]/gi, '_');
-        const inspDate = document.getElementById('inspection_date').value;
-        const storageRef = ref(storage, `auditorias_pdf/${sanitizedRazao}_${inspDate}.pdf`);
+        const sanitizedEst = document.getElementById('establishment_name').value.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        const now = new Date();
+        const ts = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}h${String(now.getMinutes()).padStart(2,'0')}`;
+        const storageRef = ref(storage, `auditorias/${auth.currentUser.uid}/${sanitizedEst}_${ts}.pdf`);
         await uploadString(storageRef, pdfData, 'data_url');
         pdfUrl = await getDownloadURL(storageRef);
+        alert('PDF da auditoria salvo com sucesso!');
     }
     const docRef = await addDoc(collection(db, 'auditorias'), {
         uid: auth.currentUser.uid,
@@ -654,11 +657,13 @@ async function saveActionPlan(auditId, pdfData) {
     if(!auth.currentUser || !actionPlanData.length || !auditId) return;
     let pdfUrl = null;
     if(pdfData){
-        const sanitizedRazao = clienteRazao.replace(/[^a-z0-9]/gi, '_');
-        const inspDate = document.getElementById('inspection_date').value;
-        const storageRef = ref(storage, `auditorias_pdf/${sanitizedRazao}_${inspDate}_plano.pdf`);
+        const sanitizedEst = document.getElementById('establishment_name').value.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        const now = new Date();
+        const ts = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}h${String(now.getMinutes()).padStart(2,'0')}`;
+        const storageRef = ref(storage, `planos_acao/${auth.currentUser.uid}/${sanitizedEst}_${ts}.pdf`);
         await uploadString(storageRef, pdfData, 'data_url');
         pdfUrl = await getDownloadURL(storageRef);
+        alert('PDF do Plano de Ação salvo com sucesso!');
     }
     const planRef = await addDoc(collection(db, 'planosAcao'), {
         uid: auth.currentUser.uid,
@@ -746,8 +751,8 @@ document.getElementById("action-plan-next").addEventListener("click", async () =
     if(planOnlyMode){
         await saveActionPlan(currentAuditId, pdfData);
         await loadPendingAudits();
-        await loadMyAudits();
-        tabButtons[1].click();
+        await loadHistory();
+        tabButtons[2].click();
         planOnlyMode = false;
     } else {
         navigateToStep(4);
@@ -854,6 +859,7 @@ document.getElementById("action-plan-next").addEventListener("click", async () =
   }
   const fileName = `Relatorio-${(document.getElementById('establishment_name').value || 'Auditoria').replace(/[^a-z0-9]/gi, '_')}.pdf`;
   doc.save(fileName);
+  await loadHistory();
   loaderStatus.textContent = '✅ Auditoria finalizada. O relatório foi gerado com sucesso!';
   setTimeout(() => navigateToStep(4), 2000);
 });
@@ -880,25 +886,51 @@ async function loadPendingAudits(){
     });
 }
 
-async function loadMyAudits(){
+async function loadHistory(){
     if(!auth.currentUser) return;
-    const q = query(collection(db,'auditorias'), where('uid','==',auth.currentUser.uid));
-    const snap = await getDocs(q);
-    const container = document.getElementById('my-audits');
-    container.innerHTML='';
-    const docs = snap.docs.sort((a,b)=>(b.data().createdAt?.seconds||0)-(a.data().createdAt?.seconds||0));
-    docs.forEach(docu=>{
-        const d=docu.data();
-        const div=document.createElement('div');
-        div.className='bg-white p-4 rounded shadow space-y-2';
-        let html=`<p class='font-medium'>${d.razaoSocial}</p><p class='text-sm text-gray-500'>${new Date(d.data).toLocaleDateString('pt-BR')}</p>`;
-        if(d.pdfUrl){
-            html+=`<button data-view-audit='${docu.id}' class='bg-green-600 text-white px-3 py-1 rounded mr-2'>Visualizar PDF da Auditoria</button>`;
+    const container = document.getElementById('history-list');
+    container.innerHTML = '';
+    const files = [];
+    const uid = auth.currentUser.uid;
+
+    const fetchFolder = async (path, label) => {
+        const folderRef = ref(storage, path);
+        const list = await listAll(folderRef);
+        for(const itemRef of list.items){
+            const url = await getDownloadURL(itemRef);
+            const meta = await getMetadata(itemRef);
+            files.push({
+                name: itemRef.name,
+                url,
+                time: meta.timeCreated,
+                label
+            });
         }
-        if(d.actionPlanGenerated){
-            html+=`<button data-view-plan='${d.actionPlanId}' class='bg-blue-600 text-white px-3 py-1 rounded'>Visualizar PDF do Plano de Ação</button>`;
-        }
-        div.innerHTML=html;
+    };
+
+    await fetchFolder(`auditorias/${uid}/`, 'Relatório');
+    await fetchFolder(`planos_acao/${uid}/`, 'Plano de Ação');
+
+    files.sort((a,b)=> new Date(b.time) - new Date(a.time));
+
+    if(files.length===0){
+        document.getElementById('no-history').classList.remove('hidden');
+        return;
+    }
+    document.getElementById('no-history').classList.add('hidden');
+
+    files.forEach(f=>{
+        const div = document.createElement('div');
+        div.className='bg-white p-4 rounded shadow flex justify-between items-center';
+        div.innerHTML = `
+            <div class='flex items-center'>
+                <svg class='w-5 h-5 mr-2 text-gray-500' fill='none' stroke='currentColor' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z'></path><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M14 2v6h6'></path></svg>
+                <div>
+                    <p class='font-medium'>${f.name}${f.label==='Plano de Ação' ? ' - Plano de Ação' : ''}</p>
+                    <p class='text-sm text-gray-500'>${new Date(f.time).toLocaleString('pt-BR')}</p>
+                </div>
+            </div>
+            <a href='${f.url}' target='_blank' class='bg-blue-600 text-white px-3 py-1 rounded'>Abrir</a>`;
         container.appendChild(div);
     });
 }
