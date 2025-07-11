@@ -224,6 +224,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebas
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
 import { getFirestore, collection, doc, getDoc, setDoc, addDoc, getDocs, query, where, orderBy, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 import { getStorage, ref, uploadString, getDownloadURL, listAll, getMetadata } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js";
+import { gerarRelatorioPlanoAcao } from './planoAcaoPDF.js';
 
         const firebaseConfig = {
           apiKey: "AIzaSyDiD0Qs5GAp-VZ0WYwx-543ruoF08MEYfg",
@@ -719,65 +720,6 @@ async function saveActionPlan(auditId, pdfData) {
     await updateDoc(doc(db, 'auditorias', auditId), { actionPlanGenerated: true, actionPlanId: planRef.id });
 }
 
-function generateActionPlanPDF() {
-    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-    const pageWidth = doc.internal.pageSize.getWidth();
-    let y = 15;
-
-    const logo = document.getElementById('company-logo-header');
-    if (logo) doc.addImage(logo, 'JPEG', pageWidth - 35, y - 5, 20, 20);
-
-    doc.setFillColor(235, 240, 255);
-    doc.rect(15, y - 5, pageWidth - 30, 25, 'F');
-    doc.setFont('helvetica', 'bold').setFontSize(18);
-    doc.text('Plano de Ação', pageWidth / 2, y + 5, { align: 'center' });
-
-    doc.setFontSize(11).setFont('helvetica', 'normal');
-    const estName = document.getElementById('establishment_name').value;
-    const auditDate = new Date().toLocaleDateString('pt-BR');
-    const auditor = currentUserData?.nome || '';
-    const crn = currentUserData?.crn || '';
-    doc.text(`Cliente: ${estName}`, 20, y + 12);
-    doc.text(`Data da Auditoria: ${auditDate}`, 20, y + 18);
-    doc.text(`Auditor: ${auditor}`, pageWidth/2 + 10, y + 12);
-    doc.text(`CRN: ${crn}`, pageWidth/2 + 10, y + 18);
-    doc.text(`Responsável: ${responsavelNome} – ${responsavelCargo}`, 20, y + 24);
-
-    y += 32;
-
-    actionPlanData.forEach((item, idx) => {
-        if(y > 250){ doc.addPage(); y = 15; }
-        const qText = doc.splitTextToSize(item.question, pageWidth - 40);
-        const justText = doc.splitTextToSize('Justificativa: ' + item.justification, pageWidth - 40);
-        let boxHeight = 8 + qText.length*5 + justText.length*5;
-        if(idx % 2 === 1){
-            doc.setFillColor(245,245,245);
-            doc.rect(15, y - 2, pageWidth - 30, boxHeight, 'F');
-        }
-        doc.setDrawColor(200);
-        doc.roundedRect(15, y - 2, pageWidth - 30, boxHeight, 2, 2);
-        let textY = y + 4;
-        doc.setFont('helvetica','bold');
-        doc.text(qText, 20, textY);
-        textY += qText.length*5;
-        doc.setFont('helvetica','normal');
-        doc.text(justText, 20, textY);
-        textY += justText.length*5;
-        doc.text(`Início: ${item.inicio}`, 20, textY);
-        doc.text(`Término: ${item.termino}`, pageWidth/2 + 10, textY);
-        y += boxHeight + 4;
-    });
-
-    const footerY = doc.internal.pageSize.getHeight() - 10;
-    doc.setFontSize(11).setFont('helvetica', 'normal');
-    doc.text(`Responsável técnico: ${auditor} – CRN: ${crn}`, 15, footerY - 5);
-    doc.text(`Responsável local: ${responsavelNome} – ${responsavelCargo}`, 15, footerY);
-
-    const name = `PlanoAcao-${(estName || 'Auditoria').replace(/[^a-z0-9]/gi,'_')}.pdf`;
-    const dataUri = doc.output('datauristring');
-    doc.save(name);
-    return dataUri;
-}
 
 document.getElementById("action-plan-next").addEventListener("click", async () => {
     actionPlanData = [];
@@ -789,7 +731,15 @@ document.getElementById("action-plan-next").addEventListener("click", async () =
             termino: div.querySelector("[data-end]").value
         });
     });
-    const pdfData = generateActionPlanPDF();
+    const pdfData = gerarRelatorioPlanoAcao({
+        itens: actionPlanData,
+        estName: document.getElementById('establishment_name').value,
+        responsavelNome,
+        responsavelCargo,
+        auditorNome: currentUserData?.nome || '',
+        auditorCrn: currentUserData?.crn || '',
+        logo: document.getElementById('company-logo-header')
+    });
     actionPlanPdfData = pdfData;
     document.getElementById('action-plan-success').classList.remove('hidden');
     if(planOnlyMode){
