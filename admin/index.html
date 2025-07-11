@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel Administrativo</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 p-4">
+  <div class="flex justify-between items-center mb-4">
+     <h1 class="text-xl font-bold">Painel Administrativo</h1>
+     <button id="logout-btn" class="bg-gray-600 text-white px-3 py-1 rounded">Sair</button>
+  </div>
+  <nav class="flex space-x-2 mb-4">
+     <button data-admin-tab="tab-pendentes" class="border-b-2 border-blue-600 text-blue-600 px-2 py-1">Usuários pendentes</button>
+     <button data-admin-tab="tab-cadastro" class="border-b-2 border-transparent px-2 py-1">Cadastrar manualmente</button>
+     <button data-admin-tab="tab-ativos" class="border-b-2 border-transparent px-2 py-1">Usuários ativos</button>
+  </nav>
+  <div id="tab-pendentes" class="admin-tab-content">
+     <div id="lista-pendentes" class="space-y-2"></div>
+  </div>
+  <div id="tab-cadastro" class="admin-tab-content hidden">
+     <form id="cadastro-manual-form" class="bg-white p-4 rounded shadow space-y-2">
+         <input type="password" name="master" placeholder="Senha mestre" class="border w-full p-2 rounded" required>
+         <input type="text" name="nome" placeholder="Nome" class="border w-full p-2 rounded" required>
+         <input type="text" name="cpf" placeholder="CPF" class="border w-full p-2 rounded" required>
+         <input type="text" name="crn" placeholder="CRN" class="border w-full p-2 rounded" required>
+         <input type="email" name="email" placeholder="Email" class="border w-full p-2 rounded" required>
+         <input type="password" name="senha" placeholder="Senha" class="border w-full p-2 rounded" required>
+         <select name="validade" class="border w-full p-2 rounded">
+            <option value="3">3 meses</option>
+            <option value="6">6 meses</option>
+            <option value="12">12 meses</option>
+            <option value="24">24 meses</option>
+         </select>
+         <label class="flex items-center"><input type="checkbox" name="teste" class="mr-2">Conceder 3 dias de teste gratuito</label>
+         <button class="bg-green-600 text-white px-3 py-1 rounded">Cadastrar</button>
+     </form>
+  </div>
+  <div id="tab-ativos" class="admin-tab-content hidden">
+     <div id="lista-ativos" class="space-y-2"></div>
+  </div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+import { getAuth, onAuthStateChanged, signOut, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js';
+import { getFirestore, collection, query, where, getDocs, updateDoc, doc, Timestamp, setDoc } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDiD0Qs5GAp-VZ0WYwx-543ruoF08MEYfg",
+  authDomain: "auditoria-trakto.firebaseapp.com",
+  projectId: "auditoria-trakto",
+  storageBucket: "auditoria-trakto.appspot.com",
+  messagingSenderId: "378139674082",
+  appId: "1:378139674082:web:8aa3e5c8819cfa797ae5bb"
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const tabs = document.querySelectorAll('[data-admin-tab]');
+const tabContents = document.querySelectorAll('.admin-tab-content');
+tabs.forEach(btn => btn.addEventListener('click', () => {
+  tabs.forEach(b => b.classList.remove('border-blue-600','text-blue-600'));
+  btn.classList.add('border-blue-600','text-blue-600');
+  const id = btn.dataset.adminTab;
+  tabContents.forEach(c => c.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}));
+
+onAuthStateChanged(auth, async user => {
+  if (!user) {
+    window.location.href = '../index.html';
+    return;
+  }
+  const adminSnap = await getDocs(query(collection(db,'admins'), where('email','==', user.email)));
+  if (adminSnap.empty) {
+    alert('Acesso restrito.');
+    await signOut(auth);
+    window.location.href = '../index.html';
+    return;
+  }
+  loadPendentes();
+  loadAtivos();
+});
+
+async function loadPendentes() {
+  const q = query(collection(db,'usuarios'), where('ativo','==', false));
+  const snap = await getDocs(q);
+  const container = document.getElementById('lista-pendentes');
+  container.innerHTML = '';
+  snap.forEach(docu => {
+    const data = docu.data();
+    const div = document.createElement('div');
+    div.className = 'bg-white p-4 rounded shadow mb-2';
+    div.innerHTML = `
+      <p class="font-semibold">${data.nome} - ${data.email}</p>
+      <div class="mt-2 flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+        <select data-select-validade class="border p-1 rounded">
+          <option value="3">3 meses</option>
+          <option value="6">6 meses</option>
+          <option value="12">12 meses</option>
+          <option value="24">24 meses</option>
+        </select>
+        <label class="flex items-center space-x-1"><input type="checkbox" data-check-teste> <span>Conceder 3 dias de teste gratuito</span></label>
+        <button data-liberar="${docu.id}" class="bg-green-600 text-white px-3 py-1 rounded">Liberar acesso</button>
+      </div>`;
+    container.appendChild(div);
+  });
+}
+
+document.getElementById('lista-pendentes').addEventListener('click', async e => {
+  if (e.target.dataset.liberar) {
+    const parent = e.target.closest('div');
+    const meses = parseInt(parent.querySelector('[data-select-validade]').value);
+    const conceder = parent.querySelector('[data-check-teste]').checked;
+    let validade = Timestamp.fromDate(new Date(Date.now() + meses*30*24*60*60*1000));
+    if (conceder) {
+      validade = Timestamp.fromDate(new Date(Date.now() + 3*24*60*60*1000));
+    }
+    await updateDoc(doc(db,'usuarios', e.target.dataset.liberar), { ativo:true, validade, testeGratuito:conceder });
+    loadPendentes();
+    loadAtivos();
+  }
+});
+
+document.getElementById('cadastro-manual-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const master = e.target.master.value.trim();
+  if (master !== 'MASTER123') {
+    alert('Senha mestre incorreta');
+    return;
+  }
+  const nome = e.target.nome.value.trim();
+  const cpf = e.target.cpf.value.trim();
+  const crn = e.target.crn.value.trim();
+  const email = e.target.email.value.trim();
+  const senha = e.target.senha.value;
+  const meses = parseInt(e.target.validade.value);
+  const conceder = e.target.teste.checked;
+  let validade = Timestamp.fromDate(new Date(Date.now() + meses*30*24*60*60*1000));
+  if (conceder) {
+    validade = Timestamp.fromDate(new Date(Date.now() + 3*24*60*60*1000));
+  }
+  const cred = await createUserWithEmailAndPassword(auth, email, senha);
+  await setDoc(doc(db,'usuarios', cred.user.uid), { nome, cpf, crn, email, ativo:true, validade, testeGratuito: conceder });
+  e.target.reset();
+  alert('Usuário criado.');
+  loadAtivos();
+});
+
+async function loadAtivos() {
+  const q = query(collection(db,'usuarios'), where('ativo','==', true));
+  const snap = await getDocs(q);
+  const container = document.getElementById('lista-ativos');
+  container.innerHTML = '';
+  snap.forEach(docu => {
+    const data = docu.data();
+    const validade = data.validade ? data.validade.toDate().toLocaleDateString('pt-BR') : '';
+    const div = document.createElement('div');
+    div.className = 'bg-white p-4 rounded shadow mb-2';
+    div.innerHTML = `
+      <p class="font-semibold">${data.nome} - ${data.email}</p>
+      <p class="text-sm mb-2">Validade: ${validade} ${data.testeGratuito ? '(Teste gratuito)' : ''}</p>
+      <button data-edit="${docu.id}" class="bg-blue-600 text-white px-3 py-1 rounded mr-2">Editar validade</button>
+      <button data-desativar="${docu.id}" class="bg-red-600 text-white px-3 py-1 rounded">Desativar</button>`;
+    container.appendChild(div);
+  });
+}
+
+document.getElementById('lista-ativos').addEventListener('click', async e => {
+  if (e.target.dataset.edit) {
+    const novo = prompt('Nova validade em meses (3,6,12,24):');
+    if (novo) {
+      const meses = parseInt(novo);
+      if ([3,6,12,24].includes(meses)) {
+        const validade = Timestamp.fromDate(new Date(Date.now() + meses*30*24*60*60*1000));
+        await updateDoc(doc(db,'usuarios', e.target.dataset.edit), { validade, testeGratuito:false });
+        loadAtivos();
+      }
+    }
+  }
+  if (e.target.dataset.desativar) {
+    await updateDoc(doc(db,'usuarios', e.target.dataset.desativar), { ativo:false });
+    loadAtivos();
+    loadPendentes();
+  }
+});
+
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  await signOut(auth);
+  window.location.href = '../index.html';
+});
+</script>
+</body>
+</html>
