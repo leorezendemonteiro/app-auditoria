@@ -523,7 +523,7 @@ showRegister.addEventListener("click", () => {
             }
             if (e.target.matches("#ask-action-plan-btn")) {
                 const hasNC = document.querySelectorAll("input[value=\"Não Conforme\"]:checked").length > 0;
-                if (hasNC && confirm("Deseja gerar um Plano de Ação para os itens Não Conformes?")) {
+                if (hasNC) {
                     populateActionPlan();
                     navigateToStep(6);
                 } else {
@@ -905,7 +905,7 @@ document.getElementById("action-plan-next").addEventListener("click", async () =
   doc.save(fileName);
   await loadHistory();
   loaderStatus.textContent = '✅ Auditoria finalizada. O relatório foi gerado com sucesso!';
-  setTimeout(() => navigateToStep(4), 2000);
+  window.location.href = "/relatorio";
 });
 
 async function loadPendingAudits(){
