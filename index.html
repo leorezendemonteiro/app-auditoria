@@ -158,25 +158,11 @@
                     <button id="ask-action-plan-btn" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 shadow-lg">Ir para Assinaturas</button>
                 </div>
             </div>
-<!-- Etapa 6: Plano de Ação -->
-<div id="step-6" class="step">
-    <div class="bg-white p-6 rounded-xl shadow-md w-full">
-        <h2 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Plano de Ação</h2>
-        <div id="action-plan-container" class="space-y-6"></div>
-    </div>
-    <div class="mt-8 flex flex-wrap items-center justify-center gap-4 w-full max-w-screen-sm mx-auto">
-        <button data-prev-step="3" class="bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-lg hover:bg-gray-400">Voltar</button>
-        <button id="action-plan-next" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 shadow-lg">Continuar</button>
-    </div>
-</div>
 
             <!-- Etapa 4: Assinaturas -->
             <div id="step-4" class="step">
                  <div class="bg-white p-6 rounded-xl shadow-md w-full">
                      <h2 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Assinaturas</h2>
-                     <div id="action-plan-success" class="mt-4 text-green-600 font-semibold text-center hidden">
-                         Plano de Ação gerado com sucesso! Você pode continuar ou voltar.
-                     </div>
                      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Assinatura do Responsável</label>
@@ -211,8 +197,14 @@
         </div>
 
         <div id="tab-action" class="tab-content">
-            <div id="pending-plans" class="space-y-4"></div>
-            <p id="no-pending" class="text-center text-gray-600 hidden">Nenhum plano de ação pendente.</p>
+            <div class="bg-white p-6 rounded-xl shadow-md w-full">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Plano de Ação</h2>
+                <div id="action-plan-list" class="space-y-6"></div>
+                <div class="mt-4 text-center">
+                    <button id="generate-plan-btn" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700">Gerar PDF do Plano de Ação</button>
+                    <p id="plan-success" class="mt-4 text-green-600 font-semibold hidden">Plano de Ação gerado com sucesso!</p>
+                </div>
+            </div>
         </div>
 
         </main>
@@ -239,6 +231,10 @@ import { gerarRelatorioPlanoAcao } from './planoAcaoPDF.js';
         const db = getFirestore(app);
         const storage = getStorage(app);
         let currentUserData = null;
+        const fetchDocument = async (col, id) => {
+            const snap = await getDoc(doc(db, col, id));
+            return snap.exists() ? snap.data() : null;
+        };
         const authContainer = document.getElementById("auth-container");
         const appContainer = document.getElementById("app-container");
         const loginForm = document.getElementById("login-form");
@@ -248,8 +244,6 @@ import { gerarRelatorioPlanoAcao } from './planoAcaoPDF.js';
         const userInfoEl = document.getElementById("user-info");
         let actionPlanData = [];
         let actionPlanPdfData = null;
-        let planOnlyMode = false;
-        let currentAuditId = null;
         let clienteCnpj = "";
         let clienteRazao = "";
         let responsavelNome = "";
@@ -262,6 +256,7 @@ import { gerarRelatorioPlanoAcao } from './planoAcaoPDF.js';
             const id = btn.dataset.tab;
             tabContents.forEach(c => c.classList.remove('active'));
             document.getElementById(id).classList.add('active');
+            if(id === 'tab-action') prepareActionPlanTab();
         }));
 
         const showTesteBanner = (data) => {
@@ -296,8 +291,7 @@ onAuthStateChanged(auth, async user => {
       window.location.href = 'admin/';
       return;
     }
-    const snap = await getDoc(doc(db, "usuarios", user.uid));
-    currentUserData = snap.exists() ? snap.data() : {};
+    currentUserData = await fetchDocument('usuarios', user.uid) || {};
     if (currentUserData.ativo !== true) {
       alert("Seu cadastro ainda não foi autorizado. Aguarde liberação.");
       await signOut(auth);
@@ -308,7 +302,6 @@ onAuthStateChanged(auth, async user => {
     userInfoEl.textContent = currentUserData.nome ? `${currentUserData.nome} – CRN: ${currentUserData.crn}` : '';
     authContainer.style.display = "none";
     appContainer.style.display = "block";
-    loadPendingAudits();
     loadHistory();
   } else {
     appContainer.style.display = "none";
@@ -327,8 +320,7 @@ loginForm.addEventListener("submit", async e => {
       window.location.href = 'admin/';
       return;
     }
-    const docSnap = await getDoc(doc(db, "usuarios", cred.user.uid));
-    const data = docSnap.exists() ? docSnap.data() : {};
+    const data = await fetchDocument('usuarios', cred.user.uid) || {};
     if (data.ativo !== true) {
       alert("Seu cadastro ainda não foi autorizado. Aguarde liberação.");
       await signOut(auth);
@@ -523,34 +515,18 @@ showRegister.addEventListener("click", () => {
                 if (canvas) canvas.dataset.signature = "";
             }
             if (e.target.matches("#ask-action-plan-btn")) {
-                const hasNC = document.querySelectorAll("input[value=\"Não Conforme\"]:checked").length > 0;
-                if (hasNC) {
-                    populateActionPlan();
-                    navigateToStep(6);
-                } else {
-                    navigateToStep(4);
-                }
-            }
-            if(e.target.matches('[data-gen-plan]')){
-                currentAuditId = e.target.dataset.genPlan;
-                const snap = await getDoc(doc(db,'auditorias',currentAuditId));
-                if(snap.exists()){
-                    planOnlyMode = true;
-                    populateActionPlanFromStored(snap.data().respostas || {});
-                    tabButtons[0].click();
-                    navigateToStep(6);
-                }
+                navigateToStep(4);
             }
             if(e.target.matches('[data-view-audit]')){
-                const snap = await getDoc(doc(db,'auditorias',e.target.dataset.viewAudit));
-                if(snap.exists() && snap.data().pdfUrl){
-                    window.open(snap.data().pdfUrl, '_blank');
+                const data = await fetchDocument('auditorias', e.target.dataset.viewAudit);
+                if(data && data.pdfUrl){
+                    window.open(data.pdfUrl, '_blank');
                 }
             }
             if(e.target.matches('[data-view-plan]')){
-                const snap = await getDoc(doc(db,'planosAcao',e.target.dataset.viewPlan));
-                if(snap.exists() && snap.data().pdfUrl){
-                    window.open(snap.data().pdfUrl, '_blank');
+                const data = await fetchDocument('planosAcao', e.target.dataset.viewPlan);
+                if(data && data.pdfUrl){
+                    window.open(data.pdfUrl, '_blank');
                 }
             }
         });
@@ -619,7 +595,7 @@ showRegister.addEventListener("click", () => {
         }
 
 function populateActionPlan() {
-    const container = document.getElementById("action-plan-container");
+    const container = document.getElementById("action-plan-list");
     container.innerHTML = "";
     checklistData.forEach(cat => {
         cat.questions.forEach(q => {
@@ -647,7 +623,7 @@ function populateActionPlan() {
 }
 
 function populateActionPlanFromStored(resps){
-    const container = document.getElementById("action-plan-container");
+    const container = document.getElementById("action-plan-list");
     container.innerHTML="";
     checklistData.forEach(cat=>{
         cat.questions.forEach(q=>{
@@ -659,6 +635,26 @@ function populateActionPlanFromStored(resps){
             }
         });
     });
+}
+
+function loadLastAuditData(){
+    try{
+        return JSON.parse(localStorage.getItem('lastAudit') || 'null');
+    }catch(e){
+        return null;
+    }
+}
+
+function prepareActionPlanTab(){
+    const info = loadLastAuditData();
+    const container = document.getElementById('action-plan-list');
+    container.innerHTML = '';
+    document.getElementById('plan-success').classList.add('hidden');
+    if(!info || !info.respostas){
+        container.innerHTML = '<p class="text-center text-gray-600">Nenhuma auditoria disponível.</p>';
+        return;
+    }
+    populateActionPlanFromStored(info.respostas);
 }
 
 async function saveAudit(pdfData) {
@@ -695,6 +691,13 @@ async function saveAudit(pdfData) {
         respostas: responses,
         createdAt: serverTimestamp()
     });
+    localStorage.setItem('lastAudit', JSON.stringify({
+        respostas: responses,
+        estName: document.getElementById('establishment_name').value,
+        responsavelNome,
+        responsavelCargo,
+        id: docRef.id
+    }));
     return docRef.id;
 }
 
@@ -720,38 +723,36 @@ async function saveActionPlan(auditId, pdfData) {
     await updateDoc(doc(db, 'auditorias', auditId), { actionPlanGenerated: true, actionPlanId: planRef.id });
 }
 
-
-document.getElementById("action-plan-next").addEventListener("click", async () => {
+document.getElementById('generate-plan-btn').addEventListener('click', async () => {
     actionPlanData = [];
-    document.querySelectorAll("#action-plan-container > div").forEach(div => {
+    document.querySelectorAll('#action-plan-list > div').forEach(div => {
         actionPlanData.push({
-            question: div.querySelector("p").textContent,
-            justification: div.querySelector("textarea").value,
-            inicio: div.querySelector("[data-start]").value,
-            termino: div.querySelector("[data-end]").value
+            question: div.querySelector('p').textContent,
+            justification: div.querySelector('textarea').value,
+            inicio: div.querySelector('[data-start]').value,
+            termino: div.querySelector('[data-end]').value
         });
     });
+    const last = JSON.parse(localStorage.getItem('lastAudit') || '{}');
     const pdfData = gerarRelatorioPlanoAcao({
         itens: actionPlanData,
-        estName: document.getElementById('establishment_name').value,
-        responsavelNome,
-        responsavelCargo,
+        estName: last.estName || '',
+        responsavelNome: last.responsavelNome || '',
+        responsavelCargo: last.responsavelCargo || '',
         auditorNome: currentUserData?.nome || '',
         auditorCrn: currentUserData?.crn || '',
         logo: document.getElementById('company-logo-header')
     });
     actionPlanPdfData = pdfData;
-    document.getElementById('action-plan-success').classList.remove('hidden');
-    if(planOnlyMode){
-        await saveActionPlan(currentAuditId, pdfData);
-        await loadPendingAudits();
+    if(last.id){
+        await saveActionPlan(last.id, pdfData);
         await loadHistory();
-        tabButtons[2].click();
-        planOnlyMode = false;
-    } else {
-        navigateToStep(4);
     }
+    document.getElementById('plan-success').classList.remove('hidden');
+    document.getElementById('action-plan-list').innerHTML = '';
 });
+
+
         const generateBtn = document.getElementById('generate-pdf-btn');
         const loaderStatus = document.getElementById('loader-status');
         generateBtn.addEventListener('click', async () => {
@@ -847,10 +848,7 @@ document.getElementById("action-plan-next").addEventListener("click", async () =
             doc.text(`Auditor: ${currentUserData?.nome || ''} – CRN: ${currentUserData?.crn || ''}`, 105, y + 55, { align: 'center' });
 
   const auditPdf = doc.output('datauristring');
-  const auditId = await saveAudit(auditPdf);
-  if(actionPlanData.length && actionPlanPdfData){
-      await saveActionPlan(auditId, actionPlanPdfData);
-  }
+  await saveAudit(auditPdf);
   const fileName = `Relatorio-${(document.getElementById('establishment_name').value || 'Auditoria').replace(/[^a-z0-9]/gi, '_')}.pdf`;
   doc.save(fileName);
   await loadHistory();
@@ -858,27 +856,6 @@ document.getElementById("action-plan-next").addEventListener("click", async () =
   window.location.href = "/relatorio";
 });
 
-async function loadPendingAudits(){
-    if(!auth.currentUser) return;
-    const q = query(collection(db,'auditorias'), where('uid','==',auth.currentUser.uid));
-    const snap = await getDocs(q);
-    const container = document.getElementById('pending-plans');
-    container.innerHTML = '';
-    const docs = snap.docs.map(d=>({id:d.id,...d.data()}))
-        .filter(d=>d.actionPlanGenerated===false)
-        .sort((a,b)=> (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-    if(docs.length===0){
-        document.getElementById('no-pending').classList.remove('hidden');
-        return;
-    }
-    document.getElementById('no-pending').classList.add('hidden');
-    docs.forEach(d=>{
-        const div = document.createElement('div');
-        div.className='bg-white p-4 rounded shadow flex justify-between items-center';
-        div.innerHTML=`<div><p class='font-medium'>${d.razaoSocial}</p><p class='text-sm text-gray-500'>${new Date(d.data).toLocaleDateString('pt-BR')}</p></div><button data-gen-plan='${d.id}' class='bg-blue-600 text-white px-4 py-2 rounded'>Gerar Plano de Ação</button>`;
-        container.appendChild(div);
-    });
-}
 
 async function loadHistory(){
     if(!auth.currentUser) return;

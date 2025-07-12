@@ -52,8 +52,8 @@ export function gerarRelatorioPlanoAcao({itens, estName, responsavelNome, respon
     doc.setFontSize(12).text(`Responsável: ${responsavelNome} – ${responsavelCargo}`, 105, footerY - 2, { align: 'center' });
     doc.text(`Auditor: ${auditorNome} – CRN: ${auditorCrn}`, 105, footerY + 8, { align: 'center' });
     const sanitizedName = (estName || 'empresa').replace(/[^a-z0-9]/gi,'_').toLowerCase();
-    const fileDate = auditDate.replace(/\//g,'-');
-    const fileName = `plano_acao_${sanitizedName}_${fileDate}.pdf`;
+    const fileDate = new Date().toISOString().slice(0,10);
+    const fileName = `PlanoAcao-${fileDate}-${sanitizedName}.pdf`;
     const dataUri = doc.output('datauristring');
     doc.save(fileName);
     return dataUri;
