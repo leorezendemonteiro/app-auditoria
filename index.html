@@ -197,6 +197,7 @@
         </div>
 
         <div id="tab-action" class="tab-content">
+            <div id="action-audit-list" class="mb-6"></div>
             <div class="bg-white p-6 rounded-xl shadow-md w-full">
                 <h2 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Plano de Ação</h2>
                 <div id="action-plan-list" class="space-y-6"></div>
@@ -529,6 +530,21 @@ showRegister.addEventListener("click", () => {
                     window.open(data.pdfUrl, '_blank');
                 }
             }
+            if(e.target.matches('[data-generate-plan]')){
+                const data = await fetchDocument('auditorias', e.target.dataset.generatePlan);
+                if(data && data.respostas){
+                    localStorage.setItem('lastAudit', JSON.stringify({
+                        respostas: data.respostas,
+                        estName: data.estabelecimento || '',
+                        responsavelNome: data.responsavelNome || '',
+                        responsavelCargo: data.responsavelCargo || '',
+                        id: e.target.dataset.generatePlan
+                    }));
+                    populateActionPlanFromStored(data.respostas);
+                    document.getElementById('generate-plan-btn').dataset.auditId = e.target.dataset.generatePlan;
+                    document.getElementById('action-plan-list').scrollIntoView({behavior:'smooth'});
+                }
+            }
         });
         
         document.querySelector('main').addEventListener('change', function(e) {
@@ -645,16 +661,28 @@ function loadLastAuditData(){
     }
 }
 
-function prepareActionPlanTab(){
-    const info = loadLastAuditData();
-    const container = document.getElementById('action-plan-list');
-    container.innerHTML = '';
+async function prepareActionPlanTab(){
+    if(!auth.currentUser) return;
+    const listContainer = document.getElementById('action-audit-list');
+    listContainer.innerHTML = '';
+    document.getElementById('action-plan-list').innerHTML = '';
     document.getElementById('plan-success').classList.add('hidden');
-    if(!info || !info.respostas){
-        container.innerHTML = '<p class="text-center text-gray-600">Nenhuma auditoria disponível.</p>';
+    const q = query(collection(db,'auditorias'), where('uid','==', auth.currentUser.uid), orderBy('createdAt','desc'));
+    const snap = await getDocs(q);
+    if(snap.empty){
+        listContainer.innerHTML = '<p class="text-center text-gray-600">Nenhuma auditoria disponível.</p>';
         return;
     }
-    populateActionPlanFromStored(info.respostas);
+    snap.forEach(docSnap=>{
+        const d = docSnap.data();
+        const div=document.createElement('div');
+        div.className='bg-white rounded-xl shadow-md p-4 mb-4';
+        div.innerHTML=`
+            <p class='font-semibold'>${d.estabelecimento || d.razaoSocial || ''}</p>
+            <p class='text-sm text-gray-500 mb-2'>${d.data ? new Date(d.data).toLocaleDateString('pt-BR') : ''}</p>
+            ${d.actionPlanId ? `<span class='px-3 py-1 bg-green-100 text-green-700 rounded'>Plano de Ação Gerado</span>` : `<button data-generate-plan='${docSnap.id}' class='bg-blue-600 text-white px-3 py-1 rounded'>Gerar Plano de Ação</button>`}`;
+        listContainer.appendChild(div);
+    });
 }
 
 async function saveAudit(pdfData) {
@@ -734,6 +762,7 @@ document.getElementById('generate-plan-btn').addEventListener('click', async () 
         });
     });
     const last = JSON.parse(localStorage.getItem('lastAudit') || '{}');
+    const auditId = document.getElementById('generate-plan-btn').dataset.auditId || last.id;
     const pdfData = gerarRelatorioPlanoAcao({
         itens: actionPlanData,
         estName: last.estName || '',
@@ -744,12 +773,13 @@ document.getElementById('generate-plan-btn').addEventListener('click', async () 
         logo: document.getElementById('company-logo-header')
     });
     actionPlanPdfData = pdfData;
-    if(last.id){
-        await saveActionPlan(last.id, pdfData);
+    if(auditId){
+        await saveActionPlan(auditId, pdfData);
         await loadHistory();
     }
     document.getElementById('plan-success').classList.remove('hidden');
     document.getElementById('action-plan-list').innerHTML = '';
+    document.getElementById('generate-plan-btn').dataset.auditId = '';
 });
 
 
@@ -853,55 +883,32 @@ document.getElementById('generate-plan-btn').addEventListener('click', async () 
   doc.save(fileName);
   await loadHistory();
   loaderStatus.textContent = '✅ Auditoria finalizada. O relatório foi gerado com sucesso!';
-  window.location.href = "/relatorio";
 });
-
 
 async function loadHistory(){
     if(!auth.currentUser) return;
     const container = document.getElementById('history-list');
     container.innerHTML = '';
-    const files = [];
-    const uid = auth.currentUser.uid;
-
-    const fetchFolder = async (path, label) => {
-        const folderRef = ref(storage, path);
-        const list = await listAll(folderRef);
-        for(const itemRef of list.items){
-            const url = `https://firebasestorage.googleapis.com/v0/b/auditoria-trakto.firebasestorage.app/o/${encodeURIComponent(itemRef.fullPath)}?alt=media`;
-            const meta = await getMetadata(itemRef);
-            files.push({
-                name: itemRef.name,
-                url,
-                time: meta.timeCreated,
-                label
-            });
-        }
-    };
-
-    await fetchFolder(`auditorias/${uid}/`, 'Relatório');
-    await fetchFolder(`planos_acao/${uid}/`, 'Plano de Ação');
-
-    files.sort((a,b)=> new Date(b.time) - new Date(a.time));
-
-    if(files.length===0){
+    const q = query(collection(db, 'auditorias'), where('uid','==', auth.currentUser.uid), orderBy('createdAt','desc'));
+    const snap = await getDocs(q);
+    if(snap.empty){
         document.getElementById('no-history').classList.remove('hidden');
         return;
     }
     document.getElementById('no-history').classList.add('hidden');
-
-    files.forEach(f=>{
+    snap.forEach(docSnap=>{
+        const d = docSnap.data();
         const div = document.createElement('div');
-        div.className='bg-white p-4 rounded shadow flex justify-between items-center';
-        div.innerHTML = `
-            <div class='flex items-center'>
-                <svg class='w-5 h-5 mr-2 text-gray-500' fill='none' stroke='currentColor' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z'></path><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M14 2v6h6'></path></svg>
-                <div>
-                    <p class='font-medium'>${f.name}${f.label==='Plano de Ação' ? ' - Plano de Ação' : ''}</p>
-                    <p class='text-sm text-gray-500'>${new Date(f.time).toLocaleString('pt-BR')}</p>
-                </div>
-            </div>
-            <a href='${f.url}' target='_blank' class='bg-blue-600 text-white px-3 py-1 rounded'>Abrir</a>`;
+        div.className='bg-white rounded-xl shadow-md p-4 mb-4';
+        div.innerHTML=`
+            <p class='font-semibold'>${d.estabelecimento || d.razaoSocial || ''}</p>
+            <p class='text-sm text-gray-500'>${d.data ? new Date(d.data).toLocaleDateString('pt-BR') : ''}</p>
+            <div class='mt-2 flex flex-wrap gap-2'>
+                <button data-view-audit="${docSnap.id}" class='bg-blue-600 text-white px-3 py-1 rounded flex items-center gap-1'>Ver Auditoria (PDF)</button>
+                <button data-view-audit="${docSnap.id}" class='bg-blue-500 text-white px-3 py-1 rounded flex items-center gap-1'>Gerar Auditoria Novamente</button>
+                ${d.actionPlanId ? `<button data-view-plan="${d.actionPlanId}" class='bg-green-600 text-white px-3 py-1 rounded flex items-center gap-1'>Ver Plano de Ação (PDF)</button>
+                <button data-generate-plan="${docSnap.id}" class='bg-green-500 text-white px-3 py-1 rounded flex items-center gap-1'>Gerar Plano de Ação Novamente</button>` : `<button data-generate-plan="${docSnap.id}" class='bg-green-500 text-white px-3 py-1 rounded flex items-center gap-1'>Gerar Plano de Ação</button>`}
+            </div>`;
         container.appendChild(div);
     });
 }
