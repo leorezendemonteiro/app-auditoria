@@ -215,14 +215,14 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
 import { getFirestore, collection, doc, getDoc, setDoc, addDoc, getDocs, query, where, orderBy, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-import { getStorage, ref, uploadString, getDownloadURL, listAll, getMetadata } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js";
+import { getStorage, ref, uploadString, listAll, getMetadata } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js";
 import { gerarRelatorioPlanoAcao } from './planoAcaoPDF.js';
 
         const firebaseConfig = {
           apiKey: "AIzaSyDiD0Qs5GAp-VZ0WYwx-543ruoF08MEYfg",
           authDomain: "auditoria-trakto.firebaseapp.com",
           projectId: "auditoria-trakto",
-          storageBucket: "auditoria-trakto.appspot.com",
+          storageBucket: "auditoria-trakto.firebasestorage.app",
           messagingSenderId: "378139674082",
           appId: "1:378139674082:web:8aa3e5c8819cfa797ae5bb"
         };
@@ -673,7 +673,7 @@ async function saveAudit(pdfData) {
         const ts = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}h${String(now.getMinutes()).padStart(2,'0')}`;
         const storageRef = ref(storage, `auditorias/${auth.currentUser.uid}/${sanitizedEst}_${ts}.pdf`);
         await uploadString(storageRef, pdfData, 'data_url');
-        pdfUrl = await getDownloadURL(storageRef);
+        pdfUrl = `https://firebasestorage.googleapis.com/v0/b/auditoria-trakto.firebasestorage.app/o/${encodeURIComponent(storageRef.fullPath)}?alt=media`;
         alert('PDF da auditoria salvo com sucesso!');
     }
     const docRef = await addDoc(collection(db, 'auditorias'), {
@@ -710,7 +710,7 @@ async function saveActionPlan(auditId, pdfData) {
         const ts = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}h${String(now.getMinutes()).padStart(2,'0')}`;
         const storageRef = ref(storage, `planos_acao/${auth.currentUser.uid}/${sanitizedEst}_${ts}.pdf`);
         await uploadString(storageRef, pdfData, 'data_url');
-        pdfUrl = await getDownloadURL(storageRef);
+        pdfUrl = `https://firebasestorage.googleapis.com/v0/b/auditoria-trakto.firebasestorage.app/o/${encodeURIComponent(storageRef.fullPath)}?alt=media`;
         alert('PDF do Plano de Ação salvo com sucesso!');
     }
     const planRef = await addDoc(collection(db, 'planosAcao'), {
@@ -868,7 +868,7 @@ async function loadHistory(){
         const folderRef = ref(storage, path);
         const list = await listAll(folderRef);
         for(const itemRef of list.items){
-            const url = await getDownloadURL(itemRef);
+            const url = `https://firebasestorage.googleapis.com/v0/b/auditoria-trakto.firebasestorage.app/o/${encodeURIComponent(itemRef.fullPath)}?alt=media`;
             const meta = await getMetadata(itemRef);
             files.push({
                 name: itemRef.name,
