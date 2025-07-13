@@ -4,7 +4,7 @@ export function gerarRelatorioPlanoAcao({itens, estName, responsavelNome, respon
     const pageWidth = doc.internal.pageSize.getWidth();
     let y = 15;
     if (logo) {
-        const imgW = 40; // aproximado de 120px
+        const imgW = 40; // largura aproximada de 120px
         const imgX = (pageWidth - imgW) / 2;
         doc.addImage(logo, 'PNG', imgX, y - 5, imgW, 15);
         y += 20;

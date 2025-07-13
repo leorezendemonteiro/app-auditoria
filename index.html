@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>App de Auditoria Sanitária</title>
+    <title>TraktoAudit</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
@@ -17,8 +17,8 @@
     <style>
         body { font-family: 'Inter', sans-serif; }
         #auth-container {
-            background-image: url('https://traktoaudit.vercel.app/assets/bg-login.jpg');
-            background-size: cover;
+            background-image: url('https://imgur.com/a/p4qGf6l');
+            background-size: contain;
             background-position: center;
             background-repeat: no-repeat;
         }
@@ -35,7 +35,7 @@
 
         #splash-screen {
             background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('https://images.pexels.com/photos/326279/pexels-photo-326279.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1');
-            background-size: cover;
+            background-size: contain;
             background-position: center;
         }
         .tab-content { display: none; }
@@ -66,7 +66,7 @@
     <div id="app-container" class="container mx-auto max-w-4xl p-4 sm:p-6 md:p-8 flex flex-col min-h-screen" style="display:none;">
 
         <header id="main-header" class="bg-white p-4 sm:p-6 rounded-xl shadow-md mb-8 flex flex-col items-center space-y-2">
-            <img id="company-logo-header" src="https://traktoaudit.vercel.app/assets/logo-foodops.jpg" class="w-40 mx-auto" alt="Logo" />
+            <img id="company-logo-header" src="https://imgur.com/sDGp7Gb" class="mx-auto" style="max-width:120px;" alt="Logo" />
             <p id="header-subtitle" class="text-gray-600"></p>
             <div id="user-info" class="text-sm text-gray-700 text-center"></div>
         </header>
@@ -78,7 +78,7 @@
         </nav>
 
         <main>
-        <div id="tab-new" class="tab-content active">
+        <div id="tab-new" class="tab-content">
             <!-- Etapa 0: Dados Iniciais -->
             <div id="step-0" class="step">
                 <div class="bg-white p-6 rounded-xl shadow-md mb-4">
@@ -199,7 +199,7 @@
                 <h2 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Plano de Ação</h2>
                 <div id="action-plan-list" class="space-y-6"></div>
                 <div class="mt-4 text-center">
-                    <button id="generate-plan-btn" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700">Gerar PDF do Plano de Ação</button>
+                    <button id="generate-plan-btn" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 hidden">Gerar PDF do Plano de Ação</button>
                     <p id="plan-success" class="mt-4 text-green-600 font-semibold hidden">Plano de Ação gerado com sucesso!</p>
                 </div>
             </div>
@@ -257,7 +257,6 @@ import { gerarRelatorioPlanoAcao } from './planoAcaoPDF.js';
             tabContents.forEach(c => c.classList.remove('active'));
             document.getElementById(id).classList.add('active');
             if(id === 'tab-action') prepareActionPlanTab();
-            if(id === 'tab-new') navigateToStep(0);
         }));
 
         const showTesteBanner = (data) => {
@@ -303,7 +302,6 @@ onAuthStateChanged(auth, async user => {
     userInfoEl.textContent = currentUserData.nome ? `${currentUserData.nome} – CRN: ${currentUserData.crn}` : '';
     authContainer.style.display = "none";
     appContainer.style.display = "block";
-    navigateToStep(0);
     loadHistory();
   } else {
     appContainer.style.display = "none";
@@ -637,6 +635,13 @@ function populateActionPlan() {
             }
         });
     });
+    const btn = document.getElementById('generate-plan-btn');
+    if(container.children.length){
+        btn.classList.remove('hidden');
+    } else {
+        btn.classList.add('hidden');
+        container.innerHTML = '<p class="text-center text-gray-600">Nenhum plano de ação disponível no momento.</p>';
+    }
 }
 
 function populateActionPlanFromStored(resps){
@@ -652,6 +657,13 @@ function populateActionPlanFromStored(resps){
             }
         });
     });
+    const btn = document.getElementById('generate-plan-btn');
+    if(container.children.length){
+        btn.classList.remove('hidden');
+    } else {
+        btn.classList.add('hidden');
+        container.innerHTML = '<p class="text-center text-gray-600">Nenhum plano de ação disponível no momento.</p>';
+    }
 }
 
 function loadLastAuditData(){
@@ -668,16 +680,20 @@ async function prepareActionPlanTab(){
     listContainer.innerHTML = '';
     document.getElementById('action-plan-list').innerHTML = '';
     document.getElementById('plan-success').classList.add('hidden');
+    document.getElementById("generate-plan-btn").classList.add("hidden");
     try {
         const q = query(collection(db,'auditorias'), where('uid','==', auth.currentUser.uid), orderBy('createdAt','desc'));
         const snap = await getDocs(q);
         if(snap.empty){
-            listContainer.innerHTML = '<p class="text-center text-gray-600">Nenhum plano de ação encontrado.</p>';
+            listContainer.innerHTML = '<p class="text-center text-gray-600">Nenhum plano de ação disponível no momento.</p>';
             return;
         }
+        let hasAvailable = false;
         snap.forEach(docSnap=>{
             if(docSnap.exists()){
                 const d = docSnap.data();
+                const hasNC = Object.values(d.respostas || {}).some(v => v === 'Não Conforme');
+                if(!hasNC) return;
                 const div=document.createElement('div');
                 div.className='bg-white rounded-xl shadow-md p-4 mb-4';
                 div.innerHTML=`
@@ -685,10 +701,15 @@ async function prepareActionPlanTab(){
                     <p class='text-sm text-gray-500 mb-2'>${d.data ? new Date(d.data).toLocaleDateString('pt-BR') : ''}</p>
                     ${d.actionPlanId ? `<button disabled class='bg-gray-300 text-gray-500 px-4 py-2 rounded-lg cursor-not-allowed'>Plano de Ação Gerado</button>` : `<button data-generate-plan='${docSnap.id}' class='bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg'>Gerar Plano de Ação</button>`}`;
                 listContainer.appendChild(div);
+                hasAvailable = true;
             } else {
                 console.warn('Documento não encontrado.');
             }
         });
+        if(!hasAvailable){
+            listContainer.innerHTML = '<p class="text-center text-gray-600">Nenhum plano de ação disponível no momento.</p>';
+        }
+    }
     } catch (error) {
         console.warn('Erro ao consultar Firestore. Verifique se o índice foi criado:', error); // Você pode criar o índice manualmente com o link mostrado no console
     }
