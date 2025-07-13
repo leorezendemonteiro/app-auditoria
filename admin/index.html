@@ -6,15 +6,16 @@
   <title>Painel Administrativo</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-gray-100 p-4">
-  <div class="flex justify-between items-center mb-4">
+<body class="bg-white text-gray-800 p-4">
+  <header class="flex justify-between items-center mb-6">
+     <img src="https://i.imgur.com/sDGp7Gb.png" crossorigin="anonymous" alt="Logo" class="w-28">
      <h1 class="text-xl font-bold">Painel Administrativo</h1>
      <button id="logout-btn" class="bg-gray-600 text-white px-3 py-1 rounded">Sair</button>
-  </div>
-  <nav class="flex space-x-2 mb-4">
-     <button data-admin-tab="tab-pendentes" class="border-b-2 border-blue-600 text-blue-600 px-2 py-1">Usuários pendentes</button>
-     <button data-admin-tab="tab-cadastro" class="border-b-2 border-transparent px-2 py-1">Cadastrar manualmente</button>
-     <button data-admin-tab="tab-ativos" class="border-b-2 border-transparent px-2 py-1">Usuários ativos</button>
+  </header>
+  <nav class="flex flex-col items-center space-y-6 mb-8">
+     <button data-admin-tab="tab-pendentes" class="admin-tab-btn w-4/5 bg-blue-600 text-white py-4 rounded-lg shadow">Usuários pendentes</button>
+     <button data-admin-tab="tab-cadastro" class="admin-tab-btn w-4/5 bg-white text-gray-800 py-4 rounded-lg shadow">Cadastrar manualmente</button>
+     <button data-admin-tab="tab-ativos" class="admin-tab-btn w-4/5 bg-white text-gray-800 py-4 rounded-lg shadow">Usuários ativos</button>
   </nav>
   <div id="tab-pendentes" class="admin-tab-content">
      <div id="lista-pendentes" class="space-y-2"></div>
@@ -61,8 +62,10 @@ const db = getFirestore(app);
 const tabs = document.querySelectorAll('[data-admin-tab]');
 const tabContents = document.querySelectorAll('.admin-tab-content');
 tabs.forEach(btn => btn.addEventListener('click', () => {
-  tabs.forEach(b => b.classList.remove('border-blue-600','text-blue-600'));
-  btn.classList.add('border-blue-600','text-blue-600');
+  tabs.forEach(b => b.classList.remove('bg-blue-600','text-white'));
+  tabs.forEach(b => b.classList.add('bg-white','text-gray-800'));
+  btn.classList.add('bg-blue-600','text-white');
+  btn.classList.remove('bg-white','text-gray-800');
   const id = btn.dataset.adminTab;
   tabContents.forEach(c => c.classList.add('hidden'));
   document.getElementById(id).classList.remove('hidden');

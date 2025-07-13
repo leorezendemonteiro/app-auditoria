@@ -6,7 +6,7 @@ export function gerarRelatorioPlanoAcao({itens, estName, responsavelNome, respon
     if (logo) {
         const imgW = 40; // aproximado de 120px
         const imgX = (pageWidth - imgW) / 2;
-        doc.addImage(logo, 'JPEG', imgX, y - 5, imgW, 15);
+        doc.addImage(logo, 'PNG', imgX, y - 5, imgW, 15);
         y += 20;
     }
     doc.setFillColor(235, 240, 255);
