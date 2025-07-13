@@ -218,7 +218,7 @@
         const { jsPDF } = window.jspdf;
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, setDoc, addDoc, getDocs, query, where, orderBy, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, setDoc, addDoc, getDocs, query, where, orderBy, updateDoc, serverTimestamp, deleteDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 import { getStorage, ref, uploadString, listAll, getMetadata } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js";
 import { gerarRelatorioPlanoAcao } from './planoAcaoPDF.js';
 
@@ -929,16 +929,47 @@ async function loadHistory(){
                         <button data-view-audit="${docSnap.id}" class='bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg flex items-center gap-1'>Gerar Auditoria Novamente</button>
                         ${d.actionPlanId ? `<button data-view-plan="${d.actionPlanId}" class='bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg flex items-center gap-1'>Ver Plano de Ação (PDF)</button>
                         <button disabled class='bg-gray-300 text-gray-500 px-4 py-2 rounded-lg cursor-not-allowed flex items-center gap-1'>Plano de Ação Gerado</button>` : `<button data-generate-plan="${docSnap.id}" class='bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg flex items-center gap-1'>Gerar Plano de Ação</button>`}
+                        <button class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded" onclick="confirmarExclusaoAuditoria('${docSnap.id}')">Excluir</button>
                     </div>`;
                 container.appendChild(div);
             } else {
                 console.warn('Documento não encontrado.');
             }
         });
-    } catch (error) {
+} catch (error) {
         console.warn('Erro ao consultar Firestore. Verifique se o índice foi criado:', error); // Você pode criar o índice manualmente com o link mostrado no console
     }
 }
+
+function confirmarExclusaoAuditoria(id) {
+  const confirmacao = confirm("Tem certeza que deseja excluir esta auditoria? Esta ação também removerá o plano de ação vinculado.");
+  if (confirmacao) {
+    excluirAuditoriaEPlano(id);
+  }
+}
+
+async function excluirAuditoriaEPlano(id) {
+  try {
+    await deleteDoc(doc(db, "auditorias", id));
+
+    const planosRef = collection(db, "planosAcao");
+    const q = query(planosRef, where("auditId", "==", id));
+    const querySnapshot = await getDocs(q);
+
+    querySnapshot.forEach(async (docSnap) => {
+      await deleteDoc(doc(db, "planosAcao", docSnap.id));
+    });
+
+    alert("Auditoria e plano de ação excluídos com sucesso.");
+    window.location.reload();
+  } catch (error) {
+    console.error("Erro ao excluir auditoria/plano:", error);
+    alert("Erro ao excluir. Verifique o console.");
+  }
+}
+
+window.confirmarExclusaoAuditoria = confirmarExclusaoAuditoria;
+window.excluirAuditoriaEPlano = excluirAuditoriaEPlano;
 
         window.onload = () => {
             appContainer.style.display = "none";
