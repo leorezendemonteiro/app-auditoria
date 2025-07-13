@@ -3,7 +3,12 @@ export function gerarRelatorioPlanoAcao({itens, estName, responsavelNome, respon
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
     let y = 15;
-    if (logo) doc.addImage(logo, 'JPEG', pageWidth - 35, y - 5, 20, 20);
+    if (logo) {
+        const imgW = 40; // aproximado de 120px
+        const imgX = (pageWidth - imgW) / 2;
+        doc.addImage(logo, 'JPEG', imgX, y - 5, imgW, 15);
+        y += 20;
+    }
     doc.setFillColor(235, 240, 255);
     doc.rect(15, y - 5, pageWidth - 30, 25, 'F');
     doc.setFont('helvetica', 'bold').setFontSize(18);
