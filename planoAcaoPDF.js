@@ -60,6 +60,5 @@ export function gerarRelatorioPlanoAcao({itens, estName, responsavelNome, respon
     const fileDate = new Date().toISOString().slice(0,10);
     const fileName = `PlanoAcao-${fileDate}-${sanitizedName}.pdf`;
     const dataUri = doc.output('datauristring');
-    doc.save(fileName);
     return dataUri;
 }

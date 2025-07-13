@@ -13,6 +13,7 @@
     <!-- Manifesto da aplicação -->
     <link rel="manifest" href="manifest.webmanifest">
     <meta name="theme-color" content="#3b82f6">
+    <link rel="icon" href="https://i.imgur.com/sDGp7Gb.jpeg">
 
     <style>
         body { font-family: 'Inter', sans-serif; }
@@ -260,14 +261,14 @@ import { gerarRelatorioPlanoAcao } from './planoAcaoPDF.js';
             tabContents.forEach(c => c.classList.remove('active'));
             const active = document.getElementById(id);
             if(active) active.classList.add('active');
+            if(id === 'tab-new') navigateToStep(0);
             if(id === 'tab-history') loadHistory();
             if(id === 'tab-action') prepareActionPlanTab();
         }
 
         tabButtons.forEach(btn => btn.addEventListener('click', () => {
             const id = btn.dataset.tab;
-            const tab = id.replace('tab-','');
-            window.location.search = `?tab=${tab}`;
+            switchTab(id);
         }));
 
         const showTesteBanner = (data) => {
@@ -314,9 +315,7 @@ onAuthStateChanged(auth, async user => {
       authContainer.style.display = "none";
       appContainer.style.display = "block";
       const urlTab = new URLSearchParams(window.location.search).get('tab');
-      if(urlTab){
-        switchTab('tab-' + urlTab);
-      }
+      switchTab(urlTab ? 'tab-' + urlTab : 'tab-new');
     } else {
       appContainer.style.display = "none";
       authContainer.style.display = "flex";
@@ -766,7 +765,7 @@ async function saveAudit(pdfData) {
         responsavelCargo,
         id: docRef.id
     }));
-    return docRef.id;
+    return { id: docRef.id, pdfUrl };
 }
 
 async function saveActionPlan(auditId, pdfData) {
@@ -789,6 +788,7 @@ async function saveActionPlan(auditId, pdfData) {
         createdAt: serverTimestamp()
     });
     await updateDoc(doc(db, 'auditorias', auditId), { actionPlanGenerated: true, actionPlanId: planRef.id });
+    return { id: planRef.id, pdfUrl };
 }
 
 document.getElementById('generate-plan-btn').addEventListener('click', async () => {
@@ -814,7 +814,8 @@ document.getElementById('generate-plan-btn').addEventListener('click', async () 
     });
     actionPlanPdfData = pdfData;
     if(auditId){
-        await saveActionPlan(auditId, pdfData);
+        const res = await saveActionPlan(auditId, pdfData);
+        if(res && res.pdfUrl) window.open(res.pdfUrl, '_blank');
         await loadHistory();
     }
     document.getElementById('plan-success').classList.remove('hidden');
@@ -923,9 +924,8 @@ document.getElementById('generate-plan-btn').addEventListener('click', async () 
             doc.text(`Auditor: ${currentUserData?.nome || ''} – CRN: ${currentUserData?.crn || ''}`, 105, y + 55, { align: 'center' });
 
   const auditPdf = doc.output('datauristring');
-  await saveAudit(auditPdf);
-  const fileName = `Relatorio-${(document.getElementById('establishment_name').value || 'Auditoria').replace(/[^a-z0-9]/gi, '_')}.pdf`;
-  doc.save(fileName);
+  const result = await saveAudit(auditPdf);
+  if(result && result.pdfUrl) window.open(result.pdfUrl, '_blank');
   await loadHistory();
   loaderStatus.textContent = '✅ Auditoria finalizada. O relatório foi gerado com sucesso!';
 });
@@ -952,7 +952,6 @@ async function loadHistory(){
                     <p class='text-sm text-gray-500'>${d.data ? new Date(d.data).toLocaleDateString('pt-BR') : ''}</p>
                     <div class='mt-2 flex flex-wrap gap-2'>
                         <button data-view-audit="${docSnap.id}" class='bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg flex items-center gap-1'>Ver Auditoria (PDF)</button>
-                        <button data-view-audit="${docSnap.id}" class='bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg flex items-center gap-1'>Gerar Auditoria Novamente</button>
                     ${d.actionPlanId ? `<button data-view-plan="${d.actionPlanId}" class='bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg flex items-center gap-1'>Ver Plano de Ação (PDF)</button>` : ''}
                         <button class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded" onclick="confirmarExclusaoAuditoria('${docSnap.id}')">Excluir</button>
                     </div>`;
