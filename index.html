@@ -248,15 +248,26 @@ import { gerarRelatorioPlanoAcao } from './planoAcaoPDF.js';
         let responsavelCargo = "";
         const tabButtons = document.querySelectorAll('.tab-btn');
         const tabContents = document.querySelectorAll('.tab-content');
-        tabButtons.forEach(btn => btn.addEventListener('click', () => {
+
+        function switchTab(id){
             tabButtons.forEach(b => b.classList.remove('bg-blue-600','text-white'));
             tabButtons.forEach(b => b.classList.add('bg-white','text-gray-800'));
-            btn.classList.add('bg-blue-600','text-white');
-            btn.classList.remove('bg-white','text-gray-800');
-            const id = btn.dataset.tab;
+            const btn = document.querySelector(`[data-tab="${id}"]`);
+            if(btn){
+                btn.classList.add('bg-blue-600','text-white');
+                btn.classList.remove('bg-white','text-gray-800');
+            }
             tabContents.forEach(c => c.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
+            const active = document.getElementById(id);
+            if(active) active.classList.add('active');
+            if(id === 'tab-history') loadHistory();
             if(id === 'tab-action') prepareActionPlanTab();
+        }
+
+        tabButtons.forEach(btn => btn.addEventListener('click', () => {
+            const id = btn.dataset.tab;
+            const tab = id.replace('tab-','');
+            window.location.search = `?tab=${tab}`;
         }));
 
         const showTesteBanner = (data) => {
@@ -300,13 +311,16 @@ onAuthStateChanged(auth, async user => {
     if (!checkValidity(currentUserData)) return;
     showTesteBanner(currentUserData);
     userInfoEl.textContent = currentUserData.nome ? `${currentUserData.nome} – CRN: ${currentUserData.crn}` : '';
-    authContainer.style.display = "none";
-    appContainer.style.display = "block";
-    loadHistory();
-  } else {
-    appContainer.style.display = "none";
-    authContainer.style.display = "flex";
-  }
+      authContainer.style.display = "none";
+      appContainer.style.display = "block";
+      const urlTab = new URLSearchParams(window.location.search).get('tab');
+      if(urlTab){
+        switchTab('tab-' + urlTab);
+      }
+    } else {
+      appContainer.style.display = "none";
+      authContainer.style.display = "flex";
+    }
 });
 
 loginForm.addEventListener("submit", async e => {
@@ -674,45 +688,42 @@ function loadLastAuditData(){
     }
 }
 
-async function prepareActionPlanTab(){
-    if(!auth.currentUser) return;
-    const listContainer = document.getElementById('action-audit-list');
-    listContainer.innerHTML = '';
-    document.getElementById('action-plan-list').innerHTML = '';
-    document.getElementById('plan-success').classList.add('hidden');
-    document.getElementById("generate-plan-btn").classList.add("hidden");
-    try {
-        const q = query(collection(db,'auditorias'), where('uid','==', auth.currentUser.uid), orderBy('createdAt','desc'));
-        const snap = await getDocs(q);
-        if(snap.empty){
-            listContainer.innerHTML = '<p class="text-center text-gray-600">Nenhum plano de ação disponível no momento.</p>';
-            return;
-        }
-        let hasAvailable = false;
-        snap.forEach(docSnap=>{
-            if(docSnap.exists()){
+    async function prepareActionPlanTab(){
+        if(!auth.currentUser) return;
+        const listContainer = document.getElementById('action-audit-list');
+        listContainer.innerHTML = '';
+        document.getElementById('action-plan-list').innerHTML = '';
+        document.getElementById('plan-success').classList.add('hidden');
+        document.getElementById('generate-plan-btn').classList.add('hidden');
+        try {
+            const q = query(collection(db,'auditorias'), where('uid','==', auth.currentUser.uid), orderBy('createdAt','desc'));
+            const snap = await getDocs(q);
+            if(snap.empty){
+                listContainer.innerHTML = '<p class="text-center text-gray-600">Nenhum plano de ação disponível no momento.</p>';
+                return;
+            }
+            let hasAvailable = false;
+            snap.forEach(docSnap => {
+                if(!docSnap.exists()) return;
                 const d = docSnap.data();
                 const hasNC = Object.values(d.respostas || {}).some(v => v === 'Não Conforme');
                 if(!hasNC) return;
-                const div=document.createElement('div');
-                div.className='bg-white rounded-xl shadow-md p-4 mb-4';
-                div.innerHTML=`
+                const div = document.createElement('div');
+                div.className = 'bg-white rounded-xl shadow-md p-4 mb-4';
+                div.innerHTML = `
                     <p class='font-semibold'>${d.estabelecimento || d.razaoSocial || ''}</p>
                     <p class='text-sm text-gray-500 mb-2'>${d.data ? new Date(d.data).toLocaleDateString('pt-BR') : ''}</p>
                     ${d.actionPlanId ? `<button disabled class='bg-gray-300 text-gray-500 px-4 py-2 rounded-lg cursor-not-allowed'>Plano de Ação Gerado</button>` : `<button data-generate-plan='${docSnap.id}' class='bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg'>Gerar Plano de Ação</button>`}`;
                 listContainer.appendChild(div);
                 hasAvailable = true;
-            } else {
-                console.warn('Documento não encontrado.');
+            });
+            if(!hasAvailable){
+                listContainer.innerHTML = '<p class="text-center text-gray-600">Nenhum plano de ação disponível no momento.</p>';
             }
-        });
-        if(!hasAvailable){
-            listContainer.innerHTML = '<p class="text-center text-gray-600">Nenhum plano de ação disponível no momento.</p>';
+        } catch (error) {
+            console.warn('Erro ao consultar Firestore. Verifique se o índice foi criado:', error);
         }
-    } catch (error) {
-        console.warn('Erro ao consultar Firestore. Verifique se o índice foi criado:', error); // Você pode criar o índice manualmente com o link mostrado no console
     }
-}
 
 async function saveAudit(pdfData) {
     if(!auth.currentUser) return null;
@@ -942,8 +953,7 @@ async function loadHistory(){
                     <div class='mt-2 flex flex-wrap gap-2'>
                         <button data-view-audit="${docSnap.id}" class='bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg flex items-center gap-1'>Ver Auditoria (PDF)</button>
                         <button data-view-audit="${docSnap.id}" class='bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg flex items-center gap-1'>Gerar Auditoria Novamente</button>
-                        ${d.actionPlanId ? `<button data-view-plan="${d.actionPlanId}" class='bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg flex items-center gap-1'>Ver Plano de Ação (PDF)</button>
-                        <button disabled class='bg-gray-300 text-gray-500 px-4 py-2 rounded-lg cursor-not-allowed flex items-center gap-1'>Plano de Ação Gerado</button>` : `<button data-generate-plan="${docSnap.id}" class='bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg flex items-center gap-1'>Gerar Plano de Ação</button>`}
+                    ${d.actionPlanId ? `<button data-view-plan="${d.actionPlanId}" class='bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-lg flex items-center gap-1'>Ver Plano de Ação (PDF)</button>` : ''}
                         <button class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded" onclick="confirmarExclusaoAuditoria('${docSnap.id}')">Excluir</button>
                     </div>`;
                 container.appendChild(div);
