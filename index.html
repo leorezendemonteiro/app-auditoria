@@ -17,8 +17,8 @@
     <style>
         body { font-family: 'Inter', sans-serif; }
         #auth-container {
-            background-image: url('https://imgur.com/a/p4qGf6l');
-            background-size: contain;
+            background-image: url('https://i.imgur.com/8VJvCPI.jpeg');
+            background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
         }
@@ -66,7 +66,7 @@
     <div id="app-container" class="container mx-auto max-w-4xl p-4 sm:p-6 md:p-8 flex flex-col min-h-screen" style="display:none;">
 
         <header id="main-header" class="bg-white p-4 sm:p-6 rounded-xl shadow-md mb-8 flex flex-col items-center space-y-2">
-            <img id="company-logo-header" src="https://imgur.com/sDGp7Gb" class="mx-auto" style="max-width:120px;" alt="Logo" />
+            <img id="company-logo-header" src="https://i.imgur.com/sDGp7Gb.jpeg" class="mx-auto mb-4" style="max-width:140px;" alt="Logo" />
             <p id="header-subtitle" class="text-gray-600"></p>
             <div id="user-info" class="text-sm text-gray-700 text-center"></div>
         </header>
@@ -709,7 +709,6 @@ async function prepareActionPlanTab(){
         if(!hasAvailable){
             listContainer.innerHTML = '<p class="text-center text-gray-600">Nenhum plano de ação disponível no momento.</p>';
         }
-    }
     } catch (error) {
         console.warn('Erro ao consultar Firestore. Verifique se o índice foi criado:', error); // Você pode criar o índice manualmente com o link mostrado no console
     }
