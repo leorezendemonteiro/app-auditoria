@@ -531,16 +531,26 @@ showRegister.addEventListener("click", () => {
                 navigateToStep(4);
             }
             if(e.target.matches('[data-view-audit]')){
-                const data = await fetchDocument('auditorias', e.target.dataset.viewAudit);
-                if(data && data.pdfUrl){
-                    window.open(data.pdfUrl, '_blank');
-                }
+                const popup = window.open('', '_blank');
+                fetchDocument('auditorias', e.target.dataset.viewAudit).then(data => {
+                    if(data && data.pdfUrl){
+                        popup.location.href = data.pdfUrl;
+                    } else {
+                        popup.close();
+                        alert('PDF não encontrado');
+                    }
+                });
             }
             if(e.target.matches('[data-view-plan]')){
-                const data = await fetchDocument('planosAcao', e.target.dataset.viewPlan);
-                if(data && data.pdfUrl){
-                    window.open(data.pdfUrl, '_blank');
-                }
+                const popup = window.open('', '_blank');
+                fetchDocument('planosAcao', e.target.dataset.viewPlan).then(data => {
+                    if(data && data.pdfUrl){
+                        popup.location.href = data.pdfUrl;
+                    } else {
+                        popup.close();
+                        alert('PDF não encontrado');
+                    }
+                });
             }
             if(e.target.matches('[data-generate-plan]')){
                 const data = await fetchDocument('auditorias', e.target.dataset.generatePlan);
